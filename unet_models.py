@@ -131,9 +131,9 @@ class UNet_kernel(nn.Module):
         self.up3 = Up(256, 128 // factor, bilinear)
         self.up4 = Up(128, 64, bilinear)
         self.outc = OutConv(64, out_channels)
-        # 180 = 200 - 20 = difference between measurement and kernel(output) size.
+        # 180 = 200 - 20 = difference between measurement and kernel(output) size
         # If it's different, then it's just for testing.
-        self.conv_resize = nn.Conv2d(out_channels, out_channels, kernel_size=(180, 180))
+        self.conv_resize = nn.Conv2d(out_channels, out_channels, kernel_size=(181, 181)) # the 1 in 181 is due to N+2P-F/S + 1.
 
     def forward(self, x):
         x1 = self.inc(x)

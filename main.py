@@ -74,7 +74,7 @@ def compute_loss(dataloader, network, loss_function):
 
 number_of_samples = 2
 measurement_size = (100, 200, 200)  # = (E, n1, n2)
-kernel_size = (20 + 1, 20 + 1)  # = (m1, m2)
+kernel_size = (20, 20)  # = (m1, m2)
 print('Starting to make the data.')
 train_ds = QPIDataSet(number_of_samples, measurement_size, kernel_size)
 valid_ds = QPIDataSet(1, measurement_size, kernel_size)
