@@ -18,8 +18,8 @@ def conv_per_layer(activation, kernel, requires_grad=False):
     :param kernel:
     :return: torch tensor
     """
-    activation = activation.detach().numpy()
-    kernel = kernel.detach().numpy()
+    activation = activation.cpu().detach().numpy()
+    kernel = kernel.cpu().detach().numpy()
     batches, levels, m1, m2 = np.shape(kernel)
     _, _, n1, n2 = np.shape(activation)
     out = np.zeros([batches, levels, n1, n2])
@@ -27,6 +27,11 @@ def conv_per_layer(activation, kernel, requires_grad=False):
         for level in range(levels):
             out[batch, level] = convolve(activation[batch, 0], kernel[batch, level], mode='same')
 
+    if torch.cuda.is_available() and requires_grad:
+        return torch.tensor(out, requires_grad=True, dtype=torch.float).cuda()
+    elif torch.cuda.is_available() and not requires_grad:
+        return torch.tensor(out, requires_grad=False, dtype=torch.float).cuda()
+        
     if requires_grad:
         return torch.tensor(out, requires_grad=True, dtype=torch.float)
     return torch.tensor(out, dtype=torch.float)
@@ -53,7 +58,7 @@ def compute_loss(dataloader, network, loss_function):
 
             if torch.cuda.is_available():
                 measurement = measurement.cuda()
-                kernel = kernel.to(torch.device('cuda'))
+                kernel = kernel.cuda()
                 activation_map = activation_map.to(torch.device('cuda'))
             predic_active, predic_kernel = network(measurement)
 
@@ -69,7 +74,7 @@ def compute_loss(dataloader, network, loss_function):
 
 number_of_samples = 2
 measurement_size = (100, 200, 200)  # = (E, n1, n2)
-kernel_size = (10, 10)  # = (m1, m2)
+kernel_size = (20 + 1, 20 + 1)  # = (m1, m2)
 print('Starting to make the data.')
 train_ds = QPIDataSet(number_of_samples, measurement_size, kernel_size)
 valid_ds = QPIDataSet(1, measurement_size, kernel_size)
