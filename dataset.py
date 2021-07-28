@@ -37,16 +37,16 @@ class QPIDataSet(Dataset):
         m1, m2 = kernel_size
         self.number_of_samples = number_of_samples
         self.measurement = torch.zeros([number_of_samples, E, n1, n2])
-        self.kernel = np.zeros((number_of_samples, E, m1, m2))
-        self.activation_map = np.zeros((number_of_samples, n1, n2))
+        self.kernel = torch.zeros((number_of_samples, E, m1, m2))
+        self.activation_map = torch.zeros((number_of_samples, n1, n2))
 
         for i in range(number_of_samples):
             E_shift = np.random.randint(-4, 1)
-            temp_measurement, temp_kernel, self.activation_map[i] = Y_factory(E + E_shift, (n1, n2), kernel_size, defect_density, SNR=2)
+            temp_measurement, temp_kernel, temp_activation_map = Y_factory(E + E_shift, (n1, n2), kernel_size, defect_density, SNR=2)
 
             self.kernel[i] = torch.tensor(fix_levels(temp_kernel, E))
             self.measurement[i] = torch.tensor(fix_levels(temp_measurement, E))
-            self.activation_map[i] = torch.tensor(self.activation_map[i])
+            self.activation_map[i] = torch.tensor(temp_activation_map)
 
     def __len__(self):
         return self.number_of_samples
