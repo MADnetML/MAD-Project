@@ -1,7 +1,9 @@
+import os
+
 import numpy as np
 import torch
 from model import MADNet
-from dataset import QPIDataSet
+from stored_dataset import QPIDataSet
 from torch.optim import Adam
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -72,16 +74,12 @@ def compute_loss(dataloader, network, loss_function):
     return measurement_loss / n_batches, activation_loss / n_batches, kernel_loss / n_batches
 
 
-number_of_samples = 2
-measurement_size = (100, 200, 200)  # = (E, n1, n2)
-kernel_size = (20, 20)  # = (m1, m2)
-print('Starting to make the data.')
-train_ds = QPIDataSet(number_of_samples, measurement_size, kernel_size)
-valid_ds = QPIDataSet(1, measurement_size, kernel_size)
+train_ds = QPIDataSet(os.getcwd() + '/training_dataset')
+valid_ds = QPIDataSet(os.getcwd() + '/valdiation_dataset')
 training_dataloader = DataLoader(train_ds, batch_size=100)
 valid_dataloader = DataLoader(train_ds, batch_size=100)
-print('Finished making the data.')
 
+measurement_size = (100, 200, 200)
 net = MADNet(measurement_size)
 optimizer = Adam(net.parameters(), lr=1e-4)
 loss_func = nn.MSELoss()
