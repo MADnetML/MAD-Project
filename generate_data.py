@@ -1,5 +1,5 @@
 from simulation import Y_factory
-from dataset import fix_levels
+from streaming_dataset import fix_levels
 import torch
 import numpy as np
 import os
@@ -37,7 +37,7 @@ def save_data(number_of_samples, measurement_size, kernel_size, SNR=2, training=
 
 
 
-number_of_samples = 2
+number_of_samples = 5
 measurement_size = (100, 200, 200)  # = (E, n1, n2)
 kernel_size = (20, 20)  # = (m1, m2)
 save_data(number_of_samples, measurement_size, kernel_size, training=True)
