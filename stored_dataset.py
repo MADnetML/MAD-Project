@@ -41,10 +41,10 @@ class QPIDataSet(Dataset):
         return self.length
 
     def __getitem__(self, idx):
-        measurement = torch.load(self.measurement[idx])
-        kernel = torch.load(self.kernel[idx])
-        activation = torch.load(self.activation_map[idx])
+        measurement = np.load(self.measurement[idx])
+        kernel = np.load(self.kernel[idx])
+        activation = np.load(self.activation_map[idx])
 
         if torch.cuda.is_available():
-            return measurement.cuda(), kernel.cuda(), activation.cuda()
-        return measurement, kernel, activation
+            return torch.FloatTensor(measurement).cuda(), torch.FloatTensor(kernel).cuda(), torch.FloatTensor(activation).cuda()
+        return torch.FloatTensor(measurement), torch.FloatTensor(kernel), torch.FloatTensor(activation)
