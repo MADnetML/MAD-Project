@@ -1,15 +1,25 @@
 import os
 
 import numpy as np
+from tqdm import tqdm
+from scipy.signal import convolve
+import matplotlib.pyplot as plt
+
 import torch
+import torch.nn.functional as F
+from torch.linalg import matrix_norm
 from model import MADNet
 from stored_dataset import QPIDataSet
 from torch.optim import Adam
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from tqdm import tqdm
-from scipy.signal import convolve
-import matplotlib.pyplot as plt
+
+
+def regulated_loss(activation, kernel, target, rmagnitude):
+    mse_loss = nn.MSELoss()
+    conv = F.conv2d(activation, kernel, padding='same')
+    return mse_loss(conv, target) / 2 + rmagnitude * matrix_norm(activation)
+
 
 
 def conv_per_layer(activation, kernel, requires_grad=False):
@@ -39,7 +49,7 @@ def conv_per_layer(activation, kernel, requires_grad=False):
     return torch.tensor(out, dtype=torch.float)
 
 
-def compute_loss(dataloader, network, loss_function):
+def compute_loss(dataloader, network, loss_function, rmagnitude=0.01):
     """
     Returns three losses, measurement, activation and kernel MSE loss
     :param dataloader:
@@ -67,7 +77,7 @@ def compute_loss(dataloader, network, loss_function):
             # This line does convolution per energy level
             predic_measurement = conv_per_layer(predic_active, predic_kernel)
 
-            measurement_loss += loss_function(predic_measurement, measurement).item()
+            measurement_loss += regulated_loss(activation_map, kernel, measurement, rmagnitude)
             activation_loss += loss_function(predic_active[:, 0, :, :], activation_map).item()
             kernel_loss += loss_function(predic_kernel, kernel).item()
 
@@ -75,14 +85,14 @@ def compute_loss(dataloader, network, loss_function):
 
 
 train_ds = QPIDataSet(os.getcwd() + '/training_dataset')
-valid_ds = QPIDataSet(os.getcwd() + '/valdiation_dataset')
-training_dataloader = DataLoader(train_ds, batch_size=100)
-valid_dataloader = DataLoader(train_ds, batch_size=100)
+valid_ds = QPIDataSet(os.getcwd() + '/validation_dataset')
+training_dataloader = DataLoader(train_ds)
+valid_dataloader = DataLoader(train_ds)
 
 measurement_size = (100, 200, 200)
 net = MADNet(measurement_size)
 optimizer = Adam(net.parameters(), lr=1e-4)
-loss_func = nn.MSELoss()
+train_val_loss_func = nn.MSELoss()
 
 if torch.cuda.is_available():
     net.cuda()
@@ -117,14 +127,15 @@ for epoch in pbar:
         optimizer.zero_grad()
         pred_active, pred_kernel = net(target_measurement)
         pred_measurement = conv_per_layer(pred_active, pred_kernel, requires_grad=True)
-        loss = loss_func(pred_measurement, target_measurement)  # Regularization term to be added?
+        # loss = loss_func(pred_measurement, target_measurement)  # Regularization term to be added?
+        loss = regulated_loss(pred_active, pred_kernel, target_measurement, 0.1)
         loss.backward()
         optimizer.step()
 
     net.eval()  # put the net into evaluation mode
     measurement_training_loss, activation_training_loss, kernel_training_loss = compute_loss(training_dataloader, net,
-                                                                                             loss_func)
-    measurement_val_loss, activation_val_loss, kernel_val_loss = compute_loss(valid_dataloader, net, loss_func)
+                                                                                             train_val_loss_func)
+    measurement_val_loss, activation_val_loss, kernel_val_loss = compute_loss(valid_dataloader, net, train_val_loss_func)
 
     measurement_training_loss_vs_epoch.append(measurement_training_loss)
     activation_training_loss_loss_vs_epoch.append(activation_training_loss)
