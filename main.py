@@ -97,7 +97,7 @@ def compute_mse_loss(dataloader, net):
 train_ds = QPIDataSet(os.getcwd() + '/training_dataset')
 valid_ds = QPIDataSet(os.getcwd() + '/validation_dataset')
 training_dataloader = DataLoader(train_ds)
-valid_dataloader = DataLoader(train_ds)
+valid_dataloader = DataLoader(valid_ds)
 
 measurement_size = (100, 200, 200)
 net = MADNet(measurement_size)
