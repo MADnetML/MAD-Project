@@ -3,6 +3,7 @@ import os
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+from torch.autograd import Variable
 from simulation import Y_factory
 from copy import deepcopy
 
@@ -28,6 +29,7 @@ def fix_trans_size(matrix, size):
 class QPIDataSet(Dataset):
     def __init__(self, path2dataset):
 
+        self.path2dataset = path2dataset
         self.files_in_folder = os.listdir(path2dataset)
         self.length = len(self.files_in_folder) // 3
         self.files_in_folder.sort()
@@ -41,9 +43,13 @@ class QPIDataSet(Dataset):
         return self.length
 
     def __getitem__(self, idx):
-        measurement = torch.load(self.measurement[idx])
-        kernel = torch.load(self.kernel[idx])
-        activation = torch.load(self.activation_map[idx])
+        measurement = np.load(self.path2dataset + '/' + self.measurement[idx])
+        kernel = np.load(self.path2dataset + '/' + self.kernel[idx])
+        activation = np.load(self.path2dataset + '/' + self.activation_map[idx])
+
+        measurement = torch.FloatTensor(measurement)
+        kernel = torch.FloatTensor(kernel)
+        activation = torch.FloatTensor(activation)
 
         if torch.cuda.is_available():
             return measurement.cuda(), kernel.cuda(), activation.cuda()
