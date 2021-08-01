@@ -14,11 +14,6 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 
-# def regulated_loss(activation, kernel, target, rmagnitude):
-#     mse_loss = nn.MSELoss()
-#     conv = F.conv2d(activation, kernel, padding='same')
-#     return mse_loss(conv, target) / 2 + rmagnitude * matrix_norm(activation)
-
 
 
 def conv_per_layer(activation, kernel, requires_grad=False):
@@ -47,7 +42,6 @@ def conv_per_layer(activation, kernel, requires_grad=False):
         return torch.tensor(out, requires_grad=True, dtype=torch.float)
     return torch.tensor(out, dtype=torch.float)
 
-
 def compute_loss(dataloader, network, loss_function):
     loss = 0
 
@@ -73,6 +67,32 @@ def compute_loss(dataloader, network, loss_function):
 
     return loss / n_batches
 
+def compute_mse_loss(dataloader, net):
+    mse_loss = nn.MSELoss()
+    activation_loss = 0
+    kernel_loss = 0
+
+    if torch.cuda.is_available():
+        net.cuda()
+    net.eval()
+
+    n_batches = 0
+    with torch.no_grad():
+        for measurement, kernel, activation_map in dataloader:
+            n_batches += 1
+            if torch.cuda.is_available():
+                measurement = measurement.cuda()
+                kernel = kernel.cuda()
+                activation_map = activation_map.cuda()
+
+            predic_active, predic_kernel = net(measurement)
+            activation_loss += mse_loss(activation_map, predic_active)
+            kernel_loss += mse_loss(kernel, predic_kernel)
+
+    return activation_loss / n_batches, kernel_loss / n_batches
+
+
+
 
 train_ds = QPIDataSet(os.getcwd() + '/training_dataset')
 valid_ds = QPIDataSet(os.getcwd() + '/validation_dataset')
@@ -83,7 +103,6 @@ measurement_size = (100, 200, 200)
 net = MADNet(measurement_size)
 individual_loss = IndividualLoss()
 optimizer = Adam(net.parameters(), lr=1e-4)
-train_val_loss_func = nn.MSELoss()
 
 if torch.cuda.is_available():
     net.cuda()
@@ -91,11 +110,11 @@ if torch.cuda.is_available():
 
 n_epochs = 2
 
-measurement_training_loss_vs_epoch = []
+total_training_loss_vs_epoch = []
 activation_training_loss_loss_vs_epoch = []
 kernel_training_loss_vs_epoch = []
 
-measurement_val_loss_vs_epoch = []
+total_val_loss_vs_epoch = []
 activation_val_loss_loss_vs_epoch = []
 kernel_val_loss_vs_epoch = []
 
@@ -104,11 +123,11 @@ pbar = tqdm(range(n_epochs))
 
 for epoch in pbar:
 
-    if len(measurement_val_loss_vs_epoch) > 1:
-        pbar.set_description(f'Val loss: {round(100 * measurement_val_loss_vs_epoch[-1])},'
-                             f' Best: {round(100 * min(measurement_val_loss_vs_epoch))}; '
-                             f'Training loss:{round(100 * measurement_training_loss_vs_epoch[-1])},'
-                             f' Best: {round(100 * min(measurement_training_loss_vs_epoch))}')
+    if len(total_val_loss_vs_epoch) > 1:
+        pbar.set_description(f'Val loss: {round(100 * total_val_loss_vs_epoch[-1])},'
+                             f' Best: {round(100 * min(total_val_loss_vs_epoch))}; '
+                             f'Training loss:{round(100 * total_training_loss_vs_epoch[-1])},'
+                             f' Best: {round(100 * min(total_training_loss_vs_epoch))}')
 
     net.train()  # put the net into "training mode"
     for target_measurement, target_kernel, target_activation in training_dataloader:
@@ -118,29 +137,29 @@ for epoch in pbar:
         optimizer.zero_grad()
         pred_active, pred_kernel = net(target_measurement)
         pred_measurement = conv_per_layer(pred_active, pred_kernel, requires_grad=True)
-        # loss = loss_func(pred_measurement, target_measurement)  # Regularization term to be added?
         loss = individual_loss(pred_active.squeeze(), pred_kernel, target_activation, target_kernel)
         loss.backward()
         optimizer.step()
 
     net.eval()  # put the net into evaluation mode
-    measurement_training_loss, activation_training_loss, kernel_training_loss = compute_loss(training_dataloader, net,
-                                                                                             train_val_loss_func)
-    measurement_val_loss, activation_val_loss, kernel_val_loss = compute_loss(valid_dataloader, net, train_val_loss_func)
+    total_training_loss = compute_loss(training_dataloader, net, individual_loss)
+    total_validation_loss = compute_loss(valid_dataloader, net, individual_loss)
+    activation_training_loss, kernel_training_loss = compute_mse_loss(training_dataloader, net)
+    activation_val_loss, kernel_val_loss = compute_mse_loss(valid_dataloader, net)
 
-    measurement_training_loss_vs_epoch.append(measurement_training_loss)
+    total_training_loss_vs_epoch.append(total_training_loss)
     activation_training_loss_loss_vs_epoch.append(activation_training_loss)
     kernel_training_loss_vs_epoch.append(kernel_training_loss)
 
-    measurement_val_loss_vs_epoch.append(measurement_val_loss)
+    total_val_loss_vs_epoch.append(total_validation_loss)
     activation_val_loss_loss_vs_epoch.append(activation_val_loss)
     kernel_val_loss_vs_epoch.append(kernel_val_loss)
 
-    if min(measurement_val_loss_vs_epoch) == measurement_val_loss_vs_epoch[-1]:
+    if min(total_val_loss_vs_epoch) == total_val_loss_vs_epoch[-1]:
         torch.save(net.state_dict(), 'trained_model.pt')
 
 # Plotting results
-plt.plot(measurement_val_loss_vs_epoch)
+plt.plot(total_val_loss_vs_epoch)
 plt.ylabel('Validation Loss')
 plt.xlabel('Epoch number')
 
