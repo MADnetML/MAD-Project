@@ -81,7 +81,7 @@ valid_dataloader = DataLoader(train_ds)
 
 measurement_size = (100, 200, 200)
 net = MADNet(measurement_size)
-regulated_loss = IndividualLoss()
+individual_loss = IndividualLoss()
 optimizer = Adam(net.parameters(), lr=1e-4)
 train_val_loss_func = nn.MSELoss()
 
@@ -119,7 +119,7 @@ for epoch in pbar:
         pred_active, pred_kernel = net(target_measurement)
         pred_measurement = conv_per_layer(pred_active, pred_kernel, requires_grad=True)
         # loss = loss_func(pred_measurement, target_measurement)  # Regularization term to be added?
-        loss = regulated_loss(pred_active, pred_kernel, target_activation, target_kernel)
+        loss = individual_loss(pred_active.squeeze(), pred_kernel, target_activation, target_kernel)
         loss.backward()
         optimizer.step()
 
