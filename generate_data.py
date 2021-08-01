@@ -24,13 +24,13 @@ def save_data(number_of_samples, measurement_size, kernel_size, SNR=2, training=
                                                                        10 ** defect_density[i],
                                                                        SNR)
         if training:
-            torch.save(torch.tensor(fix_levels(temp_kernel, E)), os.getcwd() + '/training_dataset/kernel_%d.pt' % i)
-            torch.save(torch.tensor(fix_levels(temp_measurement, E)), os.getcwd() + '/training_dataset/measurement_%d.pt' % i)
-            torch.save(torch.tensor(temp_activation_map), os.getcwd() + '/training_dataset/activation_%d.pt' % i)
+            np.save(os.getcwd() + '/training_dataset/kernel_%d' % i, fix_levels(temp_kernel, E))
+            np.save(os.getcwd() + '/training_dataset/measurement_%d' % i, fix_levels(temp_measurement, E))
+            np.save(os.getcwd() + '/training_dataset/activation_%d' % i, temp_activation_map)
         elif validation:
-            torch.save(torch.tensor(fix_levels(temp_kernel, E)), os.getcwd() + '/validation_dataset/kernel_%d.pt' % i)
-            torch.save(torch.tensor(fix_levels(temp_measurement, E)), os.getcwd() + '/validation_dataset/measurement_%d.pt' % i)
-            torch.save(torch.tensor(temp_activation_map), os.getcwd() + '/validation_dataset/activation_%d.pt' % i)
+            np.save(os.getcwd() + '/validation_dataset/kernel_%d' % i, fix_levels(temp_kernel, E))
+            np.save(os.getcwd() + '/validation_dataset/measurement_%d' % i, fix_levels(temp_measurement, E))
+            np.save(os.getcwd() + '/validation_dataset/activation_%d' % i, temp_activation_map)
     if not training and not validation:
         print("Specify validation or training to save files.")
 
