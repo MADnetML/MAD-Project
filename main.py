@@ -169,9 +169,9 @@ for epoch in pbar:
     activation_training_loss_loss_vs_epoch.append(activation_training_loss)
     kernel_training_loss_vs_epoch.append(kernel_training_loss)
 
-    total_val_loss_vs_epoch.append(total_validation_loss)
-    activation_val_loss_loss_vs_epoch.append(activation_val_loss)
-    kernel_val_loss_vs_epoch.append(kernel_val_loss.cpu().data.numpy())
+    total_val_loss_vs_epoch.append(total_validation_loss.data.cpu().numpy())
+    activation_val_loss_loss_vs_epoch.append(activation_val_loss.data.cpu().numpy())
+    kernel_val_loss_vs_epoch.append(kernel_val_loss.data.cpu().numpy())
 
     if min(total_val_loss_vs_epoch) == total_val_loss_vs_epoch[-1]:
         torch.save(net.state_dict(), trained + '.pt')
