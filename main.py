@@ -97,7 +97,7 @@ def compute_mse_loss(dataloader, net):
     return activation_loss / n_batches, kernel_loss / n_batches
 
 
-model = 1
+model = 2
 train_ds = QPIDataSet(os.getcwd() + '/training_dataset')
 valid_ds = QPIDataSet(os.getcwd() + '/validation_dataset')
 training_dataloader = DataLoader(train_ds)
@@ -121,7 +121,7 @@ if torch.cuda.is_available():
     net.cuda()
     print('Using GPU.')
 
-n_epochs = 10
+n_epochs = 50
 
 total_training_loss_vs_epoch = []
 activation_training_loss_loss_vs_epoch = []
@@ -167,7 +167,7 @@ for epoch in pbar:
 
     total_val_loss_vs_epoch.append(total_validation_loss)
     activation_val_loss_loss_vs_epoch.append(activation_val_loss)
-    kernel_val_loss_vs_epoch.append(kernel_val_loss.cpu())
+    kernel_val_loss_vs_epoch.append(kernel_val_loss.cpu().data.numpy())
 
     if min(total_val_loss_vs_epoch) == total_val_loss_vs_epoch[-1]:
         torch.save(net.state_dict(), trained + '.pt')
@@ -177,6 +177,3 @@ for epoch in pbar:
     fig.savefig(figname + '.jpg', dpi=400)
 
 # Plotting results
-
-
-plt.show()
