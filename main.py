@@ -1,4 +1,5 @@
 import os
+import argparse
 
 import numpy as np
 from tqdm import tqdm
@@ -124,9 +125,45 @@ def plot_losses(total_train, total_val, ker_train, ker_val, act_train, act_val, 
     plt.tight_layout()
     plt.savefig(f'Losses_{filename}.png', dpi=400)
 
+# Adding CLI
+parser = argparse.ArgumentParser(description=
+                                 "Deep learning model for deconvolving Quasiparticle interference")
+parser.add_argument("-m", "--model",
+                    dest='model',
+                    type=int,
+                    choices=[0, 1],
+                    help="Specify which model (MADNet1 of MADNet2) will be used",
+                    required=True)
+parser.add_argument("-e", "--epochs",
+                    dest='epochs',
+                    type=int,
+                    help="Number of epochs",
+                    required=True)
+parser.add_argument("-lr", "--learning-rate",
+                    dest='lr',
+                    type=float,
+                    help="Learning rate",
+                    required=False)
+parser.add_argument("-pt", "--pre-trained",
+                    dest='pretrained',
+                    type=str,
+                    help="Path to the pretrained model.")
+parser.add_argument("-fn", "--file-name",
+                    dest='file_name',
+                    type=str,
+                    help="Name of files to be saved",
+                    required=True)
 
-file_name = ''
-model = 2
+args = parser.parse_args()
+print('Using model {} with {} epochs.\n'
+      'Learning rate = {}.\n'.format(args.model, args.epochs, args.lr))
+if args.pretrained:
+    print('Using a pretrained model.')
+
+
+model = args.model
+file_name = args.file_name
+
 train_ds = QPIDataSet(os.getcwd() + '/training_dataset')
 valid_ds = QPIDataSet(os.getcwd() + '/validation_dataset')
 training_dataloader = DataLoader(train_ds)
@@ -137,20 +174,25 @@ measurement_size = (20, 200, 200)
 if model == 1:
     net = MADNet(measurement_size)
     trained = 'trained_model1'
-    figname = 'Loss_curve1'
 else:
     net = MADNet2(measurement_size)
     trained = 'trained_model2'
-    figname = 'Loss_curve2'
+
+if args.pretrained:
+    net.load_state_dict(torch.load(args.pretrained))
 
 individual_loss = IndividualLoss()
-optimizer = Adam(net.parameters(), lr=1e-4)
+
+lr = 1e-4
+if args.lr:
+    lr = float(args.lr)
+optimizer = Adam(net.parameters(), lr=lr)
 
 if torch.cuda.is_available():
     net.cuda()
     print('Using GPU.')
 
-n_epochs = 2
+n_epochs = args.epochs
 
 total_training_loss_vs_epoch = []
 activation_training_loss_loss_vs_epoch = []
