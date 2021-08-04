@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.linalg import matrix_norm
 from torch.autograd import Variable
+from model import fix_sizes
 
 
 class RegulatedLoss(nn.Module):
@@ -31,8 +32,13 @@ class IndividualLoss(nn.Module):
         activation_pixels = activation.shape[-1] ** 2
         kernel_pixels = kernel.shape[-1] ** 2
 
-        activation_loss = F.mse_loss(activation, activation_target) / activation_pixels
-        kernel_loss = F.mse_loss(kernel, kernel_target) / kernel_pixels
+        activation_loss = F.mse_loss(activation, activation_target.squeeze()) / activation_pixels
+        if kernel.shape[-1] > kernel_target.shape[-1]:
+            diff = kernel.shape[-1] - kernel_target.shape[-1]
+            cropped = slice(diff // 2, diff // 2 + kernel_target.shape[-1])
+            kernel_loss = F.mse_loss(kernel[:, :, cropped, cropped], kernel_target) / kernel_pixels
+        else:
+            kernel_loss = F.mse_loss(kernel, kernel_target) / kernel_pixels
 
         loss = self.weights[0] * activation_loss + self.weights[1] * kernel_loss
 
