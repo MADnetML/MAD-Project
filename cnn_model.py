@@ -35,11 +35,11 @@ class CnnShrink(nn.Module):
 
         # EACH layer shrinks transverse size by a factor of 2.
         self.cnn = nn.Sequential(
-            nn.Conv2d(in_channels, in_channels, kernel_size=(3, 3), stride=(2, 2), padding=2),
+            nn.Conv2d(in_channels, in_channels, kernel_size=(4, 4), stride=(2, 2), padding=1),
             nn.ReLU(),
-            nn.Conv2d(in_channels, in_channels, kernel_size=(3, 3), stride=(2, 2), padding=2),
+            nn.Conv2d(in_channels, in_channels, kernel_size=(4, 4), stride=(2, 2), padding=1),
             nn.ReLU(),
-            nn.Conv2d(in_channels, in_channels, kernel_size=(3, 3), stride=(2, 2), padding=2),
+            nn.Conv2d(in_channels, in_channels, kernel_size=(4, 4), stride=(2, 2), padding=1),
             nn.ReLU()
         )
 
