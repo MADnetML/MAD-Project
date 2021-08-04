@@ -103,7 +103,7 @@ valid_ds = QPIDataSet(os.getcwd() + '/validation_dataset')
 training_dataloader = DataLoader(train_ds)
 valid_dataloader = DataLoader(valid_ds)
 
-measurement_size = (100, 200, 200)
+measurement_size = (20, 200, 200)
 
 if model == 1:
     net = MADNet(measurement_size)
@@ -167,13 +167,13 @@ for epoch in pbar:
 
     total_val_loss_vs_epoch.append(total_validation_loss)
     activation_val_loss_loss_vs_epoch.append(activation_val_loss)
-    kernel_val_loss_vs_epoch.append(kernel_val_loss)
+    kernel_val_loss_vs_epoch.append(kernel_val_loss.cpu())
 
     if min(total_val_loss_vs_epoch) == total_val_loss_vs_epoch[-1]:
         torch.save(net.state_dict(), trained + '.pt')
     ax.plot(total_val_loss_vs_epoch)
-    ax.ylabel('Validation Loss')
-    ax.xlabel('Epoch number')
+    ax.set_ylabel('Validation Loss')
+    ax.set_xlabel('Epoch number')
     fig.savefig(figname + '.jpg', dpi=400)
 
 # Plotting results
