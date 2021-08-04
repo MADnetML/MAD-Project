@@ -97,6 +97,36 @@ def compute_mse_loss(dataloader, net):
     return activation_loss / n_batches, kernel_loss / n_batches
 
 
+def plot_losses(total_train, total_val, ker_train, ker_val, act_train, act_val, filename):
+    fig, axs = plt.subplots(1, 3, figsize=(9, 3))
+    fig.suptitle(f'Madnet{model}')
+
+    axs[0].set_title('Total Loss')
+    axs[0].plot(total_train, label='Training')
+    axs[0].plot(total_val, label='Validation')
+    axs[0].legend()
+
+    axs[1].set_title('Kernel Loss')
+    axs[1].plot(ker_train, label='Training')
+    axs[1].plot(ker_val, label='Validation')
+    axs[1].legend()
+
+    axs[2].set_title('Activation Loss')
+    axs[2].plot(act_train, label='Training')
+    axs[2].plot(act_val, label='Validation')
+    axs[2].legend()
+
+    for i in range(3):
+        axs[i].set_xlim(left=0)
+        axs[i].set_ylim(bottom=0)
+        for axis in ['top', 'bottom', 'left', 'right']:
+            axs[i].spines[axis].set_linewidth(2)
+
+    plt.tight_layout()
+    plt.savefig(f'Losses_{filename}.png', dpi=400)
+
+
+file_name = ''
 model = 2
 train_ds = QPIDataSet(os.getcwd() + '/training_dataset')
 valid_ds = QPIDataSet(os.getcwd() + '/validation_dataset')
@@ -121,7 +151,7 @@ if torch.cuda.is_available():
     net.cuda()
     print('Using GPU.')
 
-n_epochs = 50
+n_epochs = 2
 
 total_training_loss_vs_epoch = []
 activation_training_loss_loss_vs_epoch = []
@@ -132,8 +162,6 @@ activation_val_loss_loss_vs_epoch = []
 kernel_val_loss_vs_epoch = []
 
 pbar = tqdm(range(n_epochs))
-
-fig, ax = plt.subplots()
 
 for epoch in pbar:
 
@@ -174,10 +202,10 @@ for epoch in pbar:
     kernel_val_loss_vs_epoch.append(kernel_val_loss.data.cpu().numpy())
 
     if min(total_val_loss_vs_epoch) == total_val_loss_vs_epoch[-1]:
-        torch.save(net.state_dict(), trained + '.pt')
-    ax.plot(total_val_loss_vs_epoch)
-    ax.set_ylabel('Validation Loss')
-    ax.set_xlabel('Epoch number')
-    fig.savefig(figname + '.jpg', dpi=400)
+        torch.save(net.state_dict(), trained + file_name + '.pt')
+
 
 # Plotting results
+plot_losses(total_training_loss_vs_epoch, total_val_loss_vs_epoch, kernel_training_loss_vs_epoch,
+            kernel_val_loss_vs_epoch, activation_training_loss_loss_vs_epoch, activation_val_loss_loss_vs_epoch,
+            file_name)
