@@ -15,6 +15,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 
+
 def conv_per_layer(activation, kernel, requires_grad=False):
     """
     Convolves per-batch, per-layer
@@ -98,7 +99,7 @@ def compute_mse_loss(dataloader, net):
     return activation_loss / n_batches, kernel_loss / n_batches
 
 
-def plot_losses(total_train, total_val, ker_train, ker_val, act_train, act_val, filename):
+def plot_losses(total_train, total_val, ker_train, ker_val, act_train, act_val, folder_name):
     fig, axs = plt.subplots(1, 3, figsize=(9, 3))
     fig.suptitle(f'Madnet{model}')
 
@@ -123,9 +124,9 @@ def plot_losses(total_train, total_val, ker_train, ker_val, act_train, act_val, 
             axs[i].spines[axis].set_linewidth(2)
 
     plt.tight_layout()
-    plt.savefig(f'Losses_{filename}.png', dpi=400)
+    plt.savefig(folder_name + '/Losses.png', dpi=400)
 
-# Adding CLI
+# Adding CLA
 parser = argparse.ArgumentParser(description=
                                  "Deep learning model for deconvolving Quasiparticle interference")
 parser.add_argument("-m", "--model",
@@ -144,25 +145,18 @@ parser.add_argument("-lr", "--learning-rate",
                     type=float,
                     help="Learning rate",
                     required=False)
-parser.add_argument("-pt", "--pre-trained",
-                    dest='pretrained',
+parser.add_argument("-fn", "--folder-name",
+                    dest='folder_name',
                     type=str,
-                    help="Path to the pretrained model.")
-parser.add_argument("-fn", "--file-name",
-                    dest='file_name',
-                    type=str,
-                    help="Name of files to be saved",
+                    help="Name of folder for output files to be saved in",
                     required=True)
 
 args = parser.parse_args()
 print('Using model {} with {} epochs.\n'
       'Learning rate = {}.\n'.format(args.model, args.epochs, args.lr))
-if args.pretrained:
-    print('Using a pretrained model.')
 
 
 model = args.model
-file_name = args.file_name
 
 train_ds = QPIDataSet(os.getcwd() + '/training_dataset')
 valid_ds = QPIDataSet(os.getcwd() + '/validation_dataset')
@@ -173,13 +167,20 @@ measurement_size = (20, 200, 200)
 
 if model == 1:
     net = MADNet(measurement_size)
-    trained = 'trained_model1'
 else:
     net = MADNet2(measurement_size)
-    trained = 'trained_model2'
 
-if args.pretrained:
-    net.load_state_dict(torch.load(args.pretrained))
+if os.path.isdir(args.folder_name):
+    net.load_state_dict(torch.load(args.folder_name + '/trained_model.pt'))
+    total_training_loss_vs_epoch = np.load(args.folder_name + '/total_training_loss_vs_epoch.npy').tolist()
+    activation_training_loss_loss_vs_epoch = np.load(args.folder_name + '/activation_training_loss_loss_vs_epoch.npy').tolist()
+    kernel_training_loss_vs_epoch = np.load(args.folder_name + '/kernel_training_loss_vs_epoch.npy').tolist()
+    total_val_loss_vs_epoch = np.load(args.folder_name + '/total_val_loss_vs_epoch.npy').tolist()
+    activation_val_loss_loss_vs_epoch = np.load(args.folder_name + '/activation_val_loss_loss_vs_epoch.npy').tolist()
+    kernel_val_loss_vs_epoch = np.load(args.folder_name + '/kernel_val_loss_vs_epoch.npy').tolist()
+else:
+    os.system("mkdir {}".format(args.folder_name))
+
 
 individual_loss = IndividualLoss()
 
@@ -243,10 +244,17 @@ for epoch in pbar:
     kernel_val_loss_vs_epoch.append(kernel_val_loss.data.cpu().numpy())
 
     if min(total_val_loss_vs_epoch) == total_val_loss_vs_epoch[-1]:
-        torch.save(net.state_dict(), trained + file_name + '.pt')
+        torch.save(net.state_dict(), args.folder_name + '/trained_model.pt')
+
+    np.save(args.folder_name + '/total_training_loss_vs_epoch', total_training_loss_vs_epoch)
+    np.save(args.folder_name + '/activation_training_loss_loss_vs_epoch', activation_training_loss_loss_vs_epoch)
+    np.save(args.folder_name + '/kernel_training_loss_vs_epoch', kernel_training_loss_vs_epoch)
+    np.save(args.folder_name + '/total_val_loss_vs_epoch', total_val_loss_vs_epoch)
+    np.save(args.folder_name + '/activation_val_loss_loss_vs_epoch', activation_val_loss_loss_vs_epoch)
+    np.save(args.folder_name + '/kernel_val_loss_vs_epoch', kernel_val_loss_vs_epoch)
 
 
 # Plotting results
 plot_losses(total_training_loss_vs_epoch, total_val_loss_vs_epoch, kernel_training_loss_vs_epoch,
             kernel_val_loss_vs_epoch, activation_training_loss_loss_vs_epoch, activation_val_loss_loss_vs_epoch,
-            file_name)
+            args.folder_name)
