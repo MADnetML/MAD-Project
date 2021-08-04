@@ -104,17 +104,16 @@ def plot_losses(total_train, total_val, ker_train, ker_val, act_train, act_val, 
     axs[0].set_title('Total Loss')
     axs[0].plot(total_train, label='Training')
     axs[0].plot(total_val, label='Validation')
-    axs[0].legend()
 
     axs[1].set_title('Kernel Loss')
     axs[1].plot(ker_train, label='Training')
     axs[1].plot(ker_val, label='Validation')
-    axs[1].legend()
 
     axs[2].set_title('Activation Loss')
     axs[2].plot(act_train, label='Training')
     axs[2].plot(act_val, label='Validation')
-    axs[2].legend()
+    handles, labels = axs[2].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper right')
 
     for i in range(3):
         axs[i].set_xlim(left=0)
