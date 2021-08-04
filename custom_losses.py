@@ -32,7 +32,7 @@ class IndividualLoss(nn.Module):
         activation_pixels = activation.shape[-1] ** 2
         kernel_pixels = kernel.shape[-1] ** 2
 
-        activation_loss = F.mse_loss(activation, activation_target.squeeze()) / activation_pixels
+        activation_loss = F.mse_loss(activation.squeeze(), activation_target.squeeze()) / activation_pixels
         if kernel.shape[-1] > kernel_target.shape[-1]:
             diff = kernel.shape[-1] - kernel_target.shape[-1]
             cropped = slice(diff // 2, diff // 2 + kernel_target.shape[-1])
