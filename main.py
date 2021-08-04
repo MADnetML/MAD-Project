@@ -6,14 +6,12 @@ from scipy.signal import convolve
 import matplotlib.pyplot as plt
 
 import torch
-from model import MADNet
+from model import MADNet, MADNet2
 from stored_dataset import QPIDataSet
 from custom_losses import IndividualLoss
 from torch.optim import Adam
 import torch.nn as nn
 from torch.utils.data import DataLoader
-
-
 
 
 def conv_per_layer(activation, kernel, requires_grad=False):
@@ -37,10 +35,11 @@ def conv_per_layer(activation, kernel, requires_grad=False):
         return torch.tensor(out, requires_grad=True, dtype=torch.float).cuda()
     elif torch.cuda.is_available() and not requires_grad:
         return torch.tensor(out, requires_grad=False, dtype=torch.float).cuda()
-        
+
     if requires_grad:
         return torch.tensor(out, requires_grad=True, dtype=torch.float)
     return torch.tensor(out, dtype=torch.float)
+
 
 def compute_loss(dataloader, network, loss_function):
     loss = 0
@@ -67,6 +66,7 @@ def compute_loss(dataloader, network, loss_function):
 
     return loss / n_batches
 
+
 def compute_mse_loss(dataloader, net):
     mse_loss = nn.MSELoss()
     activation_loss = 0
@@ -87,20 +87,33 @@ def compute_mse_loss(dataloader, net):
 
             predic_active, predic_kernel = net(measurement)
             activation_loss += mse_loss(activation_map, predic_active)
-            kernel_loss += mse_loss(kernel, predic_kernel)
+            if predic_kernel.shape[-1] > kernel.shape[-1]:
+                diff = predic_kernel.shape[-1] - kernel.shape[-1]
+                cropped = slice(diff // 2, diff // 2 + kernel.shape[-1])
+                kernel_loss = mse_loss(predic_kernel[:, :, cropped, cropped], kernel)
+            else:
+                kernel_loss += mse_loss(kernel, predic_kernel)
 
     return activation_loss / n_batches, kernel_loss / n_batches
 
 
-
-
+model = 1
 train_ds = QPIDataSet(os.getcwd() + '/training_dataset')
 valid_ds = QPIDataSet(os.getcwd() + '/validation_dataset')
 training_dataloader = DataLoader(train_ds)
 valid_dataloader = DataLoader(valid_ds)
 
 measurement_size = (100, 200, 200)
-net = MADNet(measurement_size)
+
+if model == 1:
+    net = MADNet(measurement_size)
+    trained = 'trained_model1'
+    figname = 'Loss_curve1'
+else:
+    net = MADNet2(measurement_size)
+    trained = 'trained_model2'
+    figname = 'Loss_curve2'
+
 individual_loss = IndividualLoss()
 optimizer = Adam(net.parameters(), lr=1e-4)
 
@@ -108,7 +121,7 @@ if torch.cuda.is_available():
     net.cuda()
     print('Using GPU.')
 
-n_epochs = 2
+n_epochs = 10
 
 total_training_loss_vs_epoch = []
 activation_training_loss_loss_vs_epoch = []
@@ -118,16 +131,17 @@ total_val_loss_vs_epoch = []
 activation_val_loss_loss_vs_epoch = []
 kernel_val_loss_vs_epoch = []
 
-
 pbar = tqdm(range(n_epochs))
+
+fig, ax = plt.subplots()
 
 for epoch in pbar:
 
     if len(total_val_loss_vs_epoch) > 1:
-        pbar.set_description(f'Val loss: {round(100 * total_val_loss_vs_epoch[-1])},'
-                             f' Best: {round(100 * min(total_val_loss_vs_epoch))}; '
-                             f'Training loss:{round(100 * total_training_loss_vs_epoch[-1])},'
-                             f' Best: {round(100 * min(total_training_loss_vs_epoch))}')
+        pbar.set_description(f'Val loss: {(100 * total_val_loss_vs_epoch[-1])},'
+                             f' Best: {(100 * min(total_val_loss_vs_epoch))}; '
+                             f'Training loss:{(100 * total_training_loss_vs_epoch[-1])},'
+                             f' Best: {(100 * min(total_training_loss_vs_epoch))}')
 
     net.train()  # put the net into "training mode"
     for target_measurement, target_kernel, target_activation in training_dataloader:
@@ -156,11 +170,13 @@ for epoch in pbar:
     kernel_val_loss_vs_epoch.append(kernel_val_loss)
 
     if min(total_val_loss_vs_epoch) == total_val_loss_vs_epoch[-1]:
-        torch.save(net.state_dict(), 'trained_model.pt')
+        torch.save(net.state_dict(), trained + '.pt')
+    ax.plot(total_val_loss_vs_epoch)
+    ax.ylabel('Validation Loss')
+    ax.xlabel('Epoch number')
+    fig.savefig(figname + '.jpg', dpi=400)
 
 # Plotting results
-plt.plot(total_val_loss_vs_epoch)
-plt.ylabel('Validation Loss')
-plt.xlabel('Epoch number')
+
 
 plt.show()
