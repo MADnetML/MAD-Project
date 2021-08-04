@@ -138,10 +138,14 @@ fig, ax = plt.subplots()
 for epoch in pbar:
 
     if len(total_val_loss_vs_epoch) > 1:
-        pbar.set_description(f'Val loss: {(100 * total_val_loss_vs_epoch[-1])},'
-                             f' Best: {(100 * min(total_val_loss_vs_epoch))}; '
-                             f'Training loss:{(100 * total_training_loss_vs_epoch[-1])},'
-                             f' Best: {(100 * min(total_training_loss_vs_epoch))}')
+        pbar.set_description('Val loss: %f.3, '
+                             'Best: %f.3.; '
+                             'Training loss: %f.3 '
+                             'Best: %f.3') % ((1e6 * total_val_loss_vs_epoch[-1]),
+                                              (1e6 * min(total_val_loss_vs_epoch)),
+                                              (1e6 * total_training_loss_vs_epoch[-1]),
+                                              (1e6 * min(total_training_loss_vs_epoch))
+                                              )
 
     net.train()  # put the net into "training mode"
     for target_measurement, target_kernel, target_activation in training_dataloader:
