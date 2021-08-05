@@ -146,6 +146,11 @@ parser.add_argument("-lr", "--learning-rate",
                     type=float,
                     help="Learning rate",
                     required=False)
+parser.add_argument("-bs", "--batch-size",
+                    dest='batch_size',
+                    type=int,
+                    help="Batch size",
+                    required=False)
 parser.add_argument("-fn", "--folder-name",
                     dest='folder_name',
                     type=str,
@@ -153,14 +158,16 @@ parser.add_argument("-fn", "--folder-name",
                     required=True)
 
 args = parser.parse_args()
+if not args.batch_size:
+    args.batch_size = 20
 if sys.platform == 'linux':
-    os.system('echo Using model {} with {} epochs'.format(args.model, args.epochs))
+    os.system('echo Using model {} with {} epochs and batch size of {}'.format(args.model, args.epochs, args.batch_size))
     if args.lr:
         os.system('echo Learning rate = {}.\n'.format(args.lr))
     else:
         os.system('echo Using default value of lr = 1e-4')
 else:
-    print('Using model {} with {} epochs'.format(args.model, args.epochs))
+    print('Using model {} with {} epochs and batch size of {}'.format(args.model, args.epochs, args.batch_size))
     if args.lr:
         print('Learning rate = {}.\n'.format(args.lr))
     else:
@@ -171,8 +178,8 @@ model = args.model
 
 train_ds = QPIDataSet(os.getcwd() + '/training_dataset')
 valid_ds = QPIDataSet(os.getcwd() + '/validation_dataset')
-training_dataloader = DataLoader(train_ds)
-valid_dataloader = DataLoader(valid_ds)
+training_dataloader = DataLoader(train_ds, batch_size=args.batch_size)
+valid_dataloader = DataLoader(valid_ds, batch_size=args.batch_size)
 
 measurement_size = (20, 200, 200)
 
@@ -220,7 +227,10 @@ optimizer = Adam(net.parameters(), lr=lr)
 
 if torch.cuda.is_available():
     net.cuda()
-    print('Using GPU.')
+    if sys.platform == 'linux':
+        os.system('echo Running on GPU.')
+    else:
+        print('Running on GPU.')
 
 n_epochs = args.epochs
 
