@@ -1,5 +1,6 @@
 import os
 import argparse
+import sys
 
 import numpy as np
 from tqdm import tqdm
@@ -132,7 +133,7 @@ parser = argparse.ArgumentParser(description=
 parser.add_argument("-m", "--model",
                     dest='model',
                     type=int,
-                    choices=[0, 1],
+                    choices=[1, 2],
                     help="Specify which model (MADNet1 of MADNet2) will be used",
                     required=True)
 parser.add_argument("-e", "--epochs",
@@ -152,8 +153,18 @@ parser.add_argument("-fn", "--folder-name",
                     required=True)
 
 args = parser.parse_args()
-print('Using model {} with {} epochs.\n'
-      'Learning rate = {}.\n'.format(args.model, args.epochs, args.lr))
+if sys.platform == 'linux':
+    os.system('echo Using model {} with {} epochs'.format(args.model, args.epochs))
+    if args.lr:
+        os.system('echo Learning rate = {}.\n'.format(args.lr))
+    else:
+        os.system('echo Using default value of lr = 1e-4')
+else:
+    print('Using model {} with {} epochs'.format(args.model, args.epochs))
+    if args.lr:
+        print('Learning rate = {}.\n'.format(args.lr))
+    else:
+        print('Using default value of lr = 1e-4')
 
 
 model = args.model
@@ -171,15 +182,33 @@ else:
     net = MADNet2(measurement_size)
 
 if os.path.isdir(args.folder_name):
-    net.load_state_dict(torch.load(args.folder_name + '/trained_model.pt'))
-    total_training_loss_vs_epoch = np.load(args.folder_name + '/total_training_loss_vs_epoch.npy').tolist()
-    activation_training_loss_loss_vs_epoch = np.load(args.folder_name + '/activation_training_loss_loss_vs_epoch.npy').tolist()
-    kernel_training_loss_vs_epoch = np.load(args.folder_name + '/kernel_training_loss_vs_epoch.npy').tolist()
-    total_val_loss_vs_epoch = np.load(args.folder_name + '/total_val_loss_vs_epoch.npy').tolist()
-    activation_val_loss_loss_vs_epoch = np.load(args.folder_name + '/activation_val_loss_loss_vs_epoch.npy').tolist()
-    kernel_val_loss_vs_epoch = np.load(args.folder_name + '/kernel_val_loss_vs_epoch.npy').tolist()
+    try:
+        net.load_state_dict(torch.load(args.folder_name + '/trained_model.pt'))
+        if sys.platform == 'linux':
+            os.system('echo parameters were loaded successfully!')
+        else:
+            print('Parameters were loaded successfully!')
+        total_training_loss_vs_epoch = np.load(args.folder_name + '/total_training_loss_vs_epoch.npy').tolist()
+        activation_training_loss_loss_vs_epoch = np.load(args.folder_name + '/activation_training_loss_loss_vs_epoch.npy').tolist()
+        kernel_training_loss_vs_epoch = np.load(args.folder_name + '/kernel_training_loss_vs_epoch.npy').tolist()
+        total_val_loss_vs_epoch = np.load(args.folder_name + '/total_val_loss_vs_epoch.npy').tolist()
+        activation_val_loss_loss_vs_epoch = np.load(args.folder_name + '/activation_val_loss_loss_vs_epoch.npy').tolist()
+        kernel_val_loss_vs_epoch = np.load(args.folder_name + '/kernel_val_loss_vs_epoch.npy').tolist()
+    except FileNotFoundError:
+            total_training_loss_vs_epoch = []
+            activation_training_loss_loss_vs_epoch = []
+            kernel_training_loss_vs_epoch = []
+            total_val_loss_vs_epoch = []
+            activation_val_loss_loss_vs_epoch = []
+            kernel_val_loss_vs_epoch = []
 else:
     os.system("mkdir {}".format(args.folder_name))
+    total_training_loss_vs_epoch = []
+    activation_training_loss_loss_vs_epoch = []
+    kernel_training_loss_vs_epoch = []
+    total_val_loss_vs_epoch = []
+    activation_val_loss_loss_vs_epoch = []
+    kernel_val_loss_vs_epoch = []
 
 
 individual_loss = IndividualLoss()
@@ -195,13 +224,7 @@ if torch.cuda.is_available():
 
 n_epochs = args.epochs
 
-total_training_loss_vs_epoch = []
-activation_training_loss_loss_vs_epoch = []
-kernel_training_loss_vs_epoch = []
 
-total_val_loss_vs_epoch = []
-activation_val_loss_loss_vs_epoch = []
-kernel_val_loss_vs_epoch = []
 
 pbar = tqdm(range(n_epochs))
 
@@ -235,9 +258,9 @@ for epoch in pbar:
     activation_training_loss, kernel_training_loss = compute_mse_loss(training_dataloader, net)
     activation_val_loss, kernel_val_loss = compute_mse_loss(valid_dataloader, net)
 
-    total_training_loss_vs_epoch.append(total_training_loss)
-    activation_training_loss_loss_vs_epoch.append(activation_training_loss)
-    kernel_training_loss_vs_epoch.append(kernel_training_loss)
+    total_training_loss_vs_epoch.append(total_training_loss.data.cpu().numpy())
+    activation_training_loss_loss_vs_epoch.append(activation_training_loss.data.cpu().numpy())
+    kernel_training_loss_vs_epoch.append(kernel_training_loss.data.cpu().numpy())
 
     total_val_loss_vs_epoch.append(total_validation_loss.data.cpu().numpy())
     activation_val_loss_loss_vs_epoch.append(activation_val_loss.data.cpu().numpy())
