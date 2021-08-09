@@ -48,7 +48,7 @@ class MADNet(nn.Module):
         self.in_kernel = input_shape[0]
         self.out_active = 16
         self.out_kernel = input_shape[0]
-        self.hidden_active = [input_shape[0] // 2, input_shape[0] // 4, input_shape[0] // 8]  # not sure about it
+        self.hidden_active = [input_shape[0], input_shape[0], input_shape[0]]  # not sure about it
         self.hidden_kernel = [input_shape[0], input_shape[0]]  # can also be changed
 
         self.cnn_active = CnnInit(self.in_active, self.out_active, self.hidden_active)
@@ -77,7 +77,7 @@ class MADNet2(nn.Module):
     def __init__(self, input_shape, look_in=False):
         super(MADNet2, self).__init__()
         self.look_in = look_in
-        self.hidden_active = [input_shape[0] // 2, input_shape[0] // 4, input_shape[0] // 8]
+        self.hidden_active = [input_shape[0], input_shape[0], input_shape[0]]
         self.input_shape = input_shape
         self.unet = UNet_active(input_shape[0], input_shape[0])  # Input channels = Output channels = E
         self.cnn_active = CnnInit(input_shape[0], 1, self.hidden_active)
