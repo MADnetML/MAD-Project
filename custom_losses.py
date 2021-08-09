@@ -48,63 +48,65 @@ class IndividualLoss(nn.Module):
         return loss
 
 
-class PixelLl(nn.Module):
-    def __init__(self):
-        super(PixelLl, self).__init__()
-        self.ll = nn.Sequential(nn.Linear(1, 10),
-                                nn.ReLU(),
-                                nn.Linear(10, 10),
-                                nn.ReLU(),
-                                nn.Linear(10, 2),
-                                nn.ReLU()
-                                )
-    def forward(self, x):
-        return self.ll(x)
+# class PixelLl(nn.Module):
+#     def __init__(self):
+#         super(PixelLl, self).__init__()
+#         self.ll = nn.Sequential(nn.Linear(1, 10),
+#                                 nn.ReLU(),
+#                                 nn.Linear(10, 10),
+#                                 nn.ReLU(),
+#                                 nn.Linear(10, 2),
+#                                 nn.ReLU()
+#                                 )
+#     def forward(self, x):
+#         return self.ll(x)
 
 
-class CrossPixelLoss(nn.Module):
-    """
-    Computes pixel-wise cross entropy loss for the activation map (only!)
-    """
-    def __init__(self):
-        super().__init__()
-        self.ll = PixelLl()
-        if torch.cuda.is_available():
-            self.ll.cuda()
-        self.cros_ent_loss = nn.CrossEntropyLoss()
-
-    def forward(self, pred, target):
-        cieled_target = torch.ceil(target)
-        if torch.cuda.is_available():
-            cieled_target.cuda()
-        loss = torch.tensor([], requires_grad=True)
-        for batch in range(pred.shape[0]):
-            for i, pixels in enumerate(pred[batch]):
-                for j, pixel in enumerate(pixels):
-                    features = self.ll(pixel.unsqueeze(0)).unsqueeze(0)
-                    long_pixel_target = cieled_target[batch][i][j].unsqueeze(0).type(torch.LongTensor)
-                    if torch.cuda.is_available():
-                        long_pixel_target = long_pixel_target.cuda()
-                    new_loss = self.cros_ent_loss(features, long_pixel_target).unsqueeze(0)
-                    torch.cat([loss, new_loss.type(torch.FloatTensor)], dim=0)
-        loss = torch.sum(loss)
-        loss = (loss + F.mse_loss(pred.squeeze(), target.squeeze())) / len(cieled_target[0][0] ** 2)
-
-        if torch.cuda.is_available():
-            return loss.cuda()
-        return loss
+# class CrossPixelLoss(nn.Module):
+#     """
+#     Computes pixel-wise cross entropy loss for the activation map (only!)
+#     """
+#     def __init__(self):
+#         super().__init__()
+#         self.ll = PixelLl()
+#         if torch.cuda.is_available():
+#             self.ll.cuda()
+#         self.cros_ent_loss = nn.CrossEntropyLoss()
+#
+#     def forward(self, pred, target):
+#         cieled_target = torch.ceil(target)
+#         if torch.cuda.is_available():
+#             cieled_target.cuda()
+#         loss = torch.tensor([], requires_grad=True)
+#         for batch in range(pred.shape[0]):
+#             for i, pixels in enumerate(pred[batch]):
+#                 for j, pixel in enumerate(pixels):
+#                     features = self.ll(pixel.unsqueeze(0)).unsqueeze(0)
+#                     long_pixel_target = cieled_target[batch][i][j].unsqueeze(0).type(torch.LongTensor)
+#                     if torch.cuda.is_available():
+#                         long_pixel_target = long_pixel_target.cuda()
+#                     new_loss = self.cros_ent_loss(features, long_pixel_target).unsqueeze(0)
+#                     torch.cat([loss, new_loss.type(torch.FloatTensor)], dim=0)
+#         loss = torch.sum(loss)
+#         loss = (loss + F.mse_loss(pred.squeeze(), target.squeeze())) / len(cieled_target[0][0] ** 2)
+#
+#         if torch.cuda.is_available():
+#             return loss.cuda()
+#         return loss
 
 
 class SumIndividualLoss(nn.Module):
     def __init__(self, weights=(0.5, 0.5)):
         super().__init__()
         self.weights = weights
-        self.activation_loss = CrossPixelLoss()
+        self.activation_class_loss = nn.CrossEntropyLoss()  # CrossPixelLoss() -> nn.CrossEntropyLoss()
 
-    def forward(self, activation, kernel, activation_target, kernel_target):
+    def forward(self, activation, activation_classes, kernel, activation_target, kernel_target):
         kernel_pixels = kernel.shape[-1] ** 2
-
-        activation_loss = self.activation_loss(activation.squeeze(), activation_target.squeeze())
+        activation_classes_target = 1*(activation_target > 1)  # Creates class labels
+        activation_loss = self.activation_class_loss(activation_classes, activation_classes_target) # Added
+        activation_loss += F.mse_loss(activation.squeeze(), activation_target)  # Added
+        activation_loss = activation_loss / (activation.shape[-1] ** 2)  # Added
         if kernel.shape[-1] > kernel_target.shape[-1]:
             diff = kernel.shape[-1] - kernel_target.shape[-1]
             cropped = slice(diff // 2, diff // 2 + kernel_target.shape[-1])
