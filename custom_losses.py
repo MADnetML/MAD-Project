@@ -75,12 +75,17 @@ class CrossPixelLoss(nn.Module):
 
     def forward(self, pred, target):
         cieled_target = torch.ceil(target)
+        if torch.cuda.is_available():
+            cieled_target.cuda()
         loss = torch.tensor([], requires_grad=True)
         for batch in range(pred.shape[0]):
             for i, pixels in enumerate(pred[batch]):
                 for j, pixel in enumerate(pixels):
                     features = self.ll(pixel.unsqueeze(0)).unsqueeze(0)
-                    new_loss = self.cros_ent_loss(features, cieled_target[batch][i][j].unsqueeze(0).type(torch.LongTensor)).unsqueeze(0)
+                    long_pixel_target = cieled_target[batch][i][j].unsqueeze(0).type(torch.LongTensor)
+                    if torch.cuda.is_available():
+                        long_pixel_target = long_pixel_target.cuda()
+                    new_loss = self.cros_ent_loss(features, long_pixel_target).unsqueeze(0)
                     torch.cat([loss, new_loss.type(torch.FloatTensor)], dim=0)
         loss = torch.sum(loss)
         loss = (loss + F.mse_loss(pred.squeeze(), target.squeeze())) / len(cieled_target[0][0] ** 2)
