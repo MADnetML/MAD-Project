@@ -8,13 +8,12 @@ from scipy.signal import convolve
 import matplotlib.pyplot as plt
 
 import torch
-from model import MADNet, MADNet2
+from model2 import MADNet, MADNet2  # model -> model2
 from stored_dataset import QPIDataSet
 from custom_losses import SumIndividualLoss
 from torch.optim import Adam
 import torch.nn as nn
 from torch.utils.data import DataLoader
-
 
 
 def conv_per_layer(activation, kernel, requires_grad=False):
@@ -60,12 +59,12 @@ def compute_loss(dataloader, network, loss_function):
                 measurement = measurement.cuda()
                 kernel = kernel.cuda()
                 activation_map = activation_map.to(torch.device('cuda'))
-            predic_active, predic_kernel = network(measurement)
+            predic_active, predic_active_classes, predic_kernel = network(measurement)
 
             # This line does convolution per energy level
             predic_measurement = conv_per_layer(predic_active, predic_kernel)
 
-            loss += loss_function(predic_active, predic_kernel, activation_map, kernel)
+            loss += loss_function(predic_active, predic_active_classes, predic_kernel, activation_map, kernel)
 
     return loss / n_batches
 
@@ -88,7 +87,7 @@ def compute_mse_loss(dataloader, net):
                 kernel = kernel.cuda()
                 activation_map = activation_map.cuda()
 
-            predic_active, predic_kernel = net(measurement)
+            predic_active, _, predic_kernel = net(measurement)
             activation_loss += mse_loss(activation_map, predic_active)
             if predic_kernel.shape[-1] > kernel.shape[-1]:
                 diff = predic_kernel.shape[-1] - kernel.shape[-1]
@@ -163,7 +162,8 @@ if not args.batch_size:
     args.batch_size = 20
 if sys.platform == 'linux':
     os.system('echo ==========================================================')
-    os.system('echo Using model {} with {} epochs and batch size of {}'.format(args.model, args.epochs, args.batch_size))
+    os.system(
+        'echo Using model {} with {} epochs and batch size of {}'.format(args.model, args.epochs, args.batch_size))
     if args.lr:
         os.system('echo Learning rate = {}.\n'.format(args.lr))
     else:
@@ -174,7 +174,6 @@ else:
         print('Learning rate = {}.\n'.format(args.lr))
     else:
         print('Using default value of lr = 1e-4')
-
 
 model = args.model
 
@@ -198,18 +197,20 @@ if os.path.isdir(args.folder_name):
         else:
             print('Parameters were loaded successfully!')
         total_training_loss_vs_epoch = np.load(args.folder_name + '/total_training_loss_vs_epoch.npy').tolist()
-        activation_training_loss_loss_vs_epoch = np.load(args.folder_name + '/activation_training_loss_loss_vs_epoch.npy').tolist()
+        activation_training_loss_loss_vs_epoch = np.load(
+            args.folder_name + '/activation_training_loss_loss_vs_epoch.npy').tolist()
         kernel_training_loss_vs_epoch = np.load(args.folder_name + '/kernel_training_loss_vs_epoch.npy').tolist()
         total_val_loss_vs_epoch = np.load(args.folder_name + '/total_val_loss_vs_epoch.npy').tolist()
-        activation_val_loss_loss_vs_epoch = np.load(args.folder_name + '/activation_val_loss_loss_vs_epoch.npy').tolist()
+        activation_val_loss_loss_vs_epoch = np.load(
+            args.folder_name + '/activation_val_loss_loss_vs_epoch.npy').tolist()
         kernel_val_loss_vs_epoch = np.load(args.folder_name + '/kernel_val_loss_vs_epoch.npy').tolist()
     except FileNotFoundError:
-            total_training_loss_vs_epoch = []
-            activation_training_loss_loss_vs_epoch = []
-            kernel_training_loss_vs_epoch = []
-            total_val_loss_vs_epoch = []
-            activation_val_loss_loss_vs_epoch = []
-            kernel_val_loss_vs_epoch = []
+        total_training_loss_vs_epoch = []
+        activation_training_loss_loss_vs_epoch = []
+        kernel_training_loss_vs_epoch = []
+        total_val_loss_vs_epoch = []
+        activation_val_loss_loss_vs_epoch = []
+        kernel_val_loss_vs_epoch = []
 else:
     os.system("mkdir {}".format(args.folder_name))
     total_training_loss_vs_epoch = []
@@ -218,7 +219,6 @@ else:
     total_val_loss_vs_epoch = []
     activation_val_loss_loss_vs_epoch = []
     kernel_val_loss_vs_epoch = []
-
 
 individual_loss = SumIndividualLoss()
 
@@ -235,8 +235,6 @@ if torch.cuda.is_available():
         print('Running on GPU.')
 
 n_epochs = args.epochs
-
-
 
 pbar = tqdm(range(n_epochs))
 
@@ -258,9 +256,10 @@ for epoch in pbar:
             target_measurement = target_measurement.cuda()
 
         optimizer.zero_grad()
-        pred_active, pred_kernel = net(target_measurement)
+        pred_active, pred_active_class, pred_kernel = net(target_measurement)
         pred_measurement = conv_per_layer(pred_active, pred_kernel, requires_grad=True)
-        loss = individual_loss(pred_active.squeeze(), pred_kernel, target_activation, target_kernel)
+        # Added pred_active_class arg
+        loss = individual_loss(pred_active.squeeze(), pred_active_class, pred_kernel, target_activation, target_kernel)
         loss.backward()
         optimizer.step()
 
@@ -287,7 +286,6 @@ for epoch in pbar:
     np.save(args.folder_name + '/total_val_loss_vs_epoch', total_val_loss_vs_epoch)
     np.save(args.folder_name + '/activation_val_loss_loss_vs_epoch', activation_val_loss_loss_vs_epoch)
     np.save(args.folder_name + '/kernel_val_loss_vs_epoch', kernel_val_loss_vs_epoch)
-
 
 # Plotting results
 plot_losses(total_training_loss_vs_epoch, total_val_loss_vs_epoch, kernel_training_loss_vs_epoch,
