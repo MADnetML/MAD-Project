@@ -100,7 +100,7 @@ def compute_regularized_loss(dataloader, network, loss_function, baseline=False)
             if baseline:
                 loss += loss_function(lam, kernel, activation_map, measurement)
             else:
-                predic_active, predic_kernel = network(measurement)
+                predic_active, _, predic_kernel = network(measurement)
                 # Maybe need to turn Torch tensor to np array
                 loss += loss_function(lam, predic_kernel, predic_active, measurement)
     return loss / n_batches
@@ -132,7 +132,7 @@ net_loss = compute_regularized_loss(testing_dataloader, net, cost_fun)
 basline_loss = compute_regularized_loss(testing_dataloader, net, cost_fun, baseline=True)
 
 measurement, kernel, activation_map = next(iter(testing_dataloader))
-pred_active, pred_kernel = net(measurement)
+pred_active, _, pred_kernel = net(measurement)
 pred_meas = conv_per_layer(pred_active, pred_kernel)
 idx_array = np.random.choice(range(E), 3, replace=False)
 losses = f'Loss = {round(net_loss, 2)}, basline = {round(basline_loss, 2)}'
