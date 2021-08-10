@@ -107,3 +107,31 @@ class MADNet2(nn.Module):
         if self.look_in:
             return active_out, active_class, kernel_out, x
         return active_out, active_class, kernel_out
+
+
+class MADNet3(nn.Module):
+    def __init__(self, input_shape, look_in=False):
+        super(MADNet3, self).__init__()
+        self.look_in = look_in
+        self.hidden_active = [input_shape[0], input_shape[0], input_shape[0]]
+        self.input_shape = input_shape
+        self.unet = UNet_active(input_shape[0], input_shape[0])  # Input channels = Output channels = E
+        self.cnn_active = CnnInit(input_shape[0], 1, self.hidden_active)
+        self.cnn_kernel = CnnShrink(input_shape[0])
+        self.classifier = nn.Sequential(
+            nn.Conv2d(1, 4, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0)),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(4, 4, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0)),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(4, 2, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0)),
+        )
+
+    def forward(self, x):
+        x = fix_sizes(x, self.input_shape)
+        unet_ker = self.unet(x)
+        active_out = self.cnn_active(x)
+        kernel_out = self.cnn_kernel(unet_ker)
+        active_class = self.classifier(active_out)
+        if self.look_in:
+            return active_out, active_class, kernel_out, x
+        return active_out, active_class, kernel_out
