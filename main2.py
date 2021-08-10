@@ -6,7 +6,6 @@ import numpy as np
 from tqdm import tqdm
 from scipy.signal import convolve
 import matplotlib.pyplot as plt
-
 import torch
 from model2 import MADNet, MADNet2  # model -> model2
 from stored_dataset import QPIDataSet
@@ -69,6 +68,27 @@ def compute_loss(dataloader, network, loss_function):
     return loss / n_batches
 
 
+def compute_class_loss(dataloader, network):
+    loss = 0
+    loss_function = nn.CrossEntropyLoss()
+    if torch.cuda.is_available():
+        network.cuda()
+    network.eval()
+    n_batches = 0
+    with torch.no_grad():
+        for measurement, _, activation_map in dataloader:
+            n_batches += 1
+
+            if torch.cuda.is_available():
+                measurement = measurement.cuda()
+                activation_map = activation_map.to(torch.device('cuda'))
+            _, predic_active_classes, _ = network(measurement)
+            activation_class_target = 1*(activation_map > 0)
+            loss += loss_function(predic_active_classes, activation_class_target)
+
+    return loss / n_batches
+
+
 def compute_mse_loss(dataloader, net):
     mse_loss = nn.MSELoss()
     activation_loss = 0
@@ -99,32 +119,69 @@ def compute_mse_loss(dataloader, net):
     return activation_loss / n_batches, kernel_loss / n_batches
 
 
-def plot_losses(total_train, total_val, ker_train, ker_val, act_train, act_val, folder_name):
-    fig, axs = plt.subplots(1, 3, figsize=(9, 3))
+def compute_regularized_loss(dataloader, network, loss_function, baseline=False):
+    loss = 0
+    lam = 0.005
+    if torch.cuda.is_available():
+        network.cuda()
+    network.eval()
+
+    n_batches = 0
+    with torch.no_grad():
+        for measurement, kernel, activation_map in dataloader:
+            n_batches += 1
+
+            if torch.cuda.is_available():
+                measurement = measurement.cuda()
+                kernel = kernel.cuda()
+                activation_map = activation_map.to(torch.device('cuda'))
+            if baseline:
+                loss += loss_function(lam, kernel, activation_map, measurement)
+            else:
+                predic_active, _, predic_kernel = network(measurement)
+                # Maybe need to turn Torch tensor to np array
+                loss += loss_function(lam, predic_kernel, predic_active, measurement)
+    return loss / n_batches
+
+
+def cost_fun(lambda_in, ker, act, meas):
+    """
+    The cost function = 0.5|A conv X - Y|**2 + lambda * r(X)
+    """
+    meas = np.array(meas.squeeze().cpu())
+    meas_pred = np.array(conv_per_layer(act, ker).squeeze().cpu())
+    phi = 0.5 * np.sum((meas_pred - meas) ** 2) + lambda_in * regulator(act)
+    return phi
+
+
+def regulator(X):
+    """
+    The pseudo-Huber regulator
+    :param X: 2D matrix
+    :return: A real number
+    """
+    X_array = np.array(X.cpu())
+    mu = 10 ** -6  # A small positive number (chosen in the paper to be 10 ** -6)
+    return np.sum(mu ** 2 * (np.sqrt(1 + (mu ** -2) * np.abs(X_array)) - 1))
+
+
+def plot_loss(training, validation, fig_name, folder_name):
+    fig, ax = plt.subplots()
     fig.suptitle(f'Madnet{model}')
 
-    axs[0].set_title('Total Loss')
-    axs[0].plot(total_train, label='Training')
-    axs[0].plot(total_val, label='Validation')
+    ax.set_title('Total Loss')
+    ax.plot(training, label='Training')
+    ax.plot(validation, label='Validation')
 
-    axs[1].set_title('Kernel Loss')
-    axs[1].plot(ker_train, label='Training')
-    axs[1].plot(ker_val, label='Validation')
-
-    axs[2].set_title('Activation Loss')
-    axs[2].plot(act_train, label='Training')
-    axs[2].plot(act_val, label='Validation')
-    handles, labels = axs[2].get_legend_handles_labels()
+    handles, labels = ax.get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper right')
-
-    for i in range(3):
-        axs[i].set_xlim(left=0)
-        axs[i].set_ylim(bottom=0)
-        for axis in ['top', 'bottom', 'left', 'right']:
-            axs[i].spines[axis].set_linewidth(2)
-
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+    for axis in ['top', 'bottom', 'left', 'right']:
+        ax.spines[axis].set_linewidth(2)
+    ax.set_title(fig_name)
     plt.tight_layout()
-    plt.savefig(folder_name + '/Losses.png', dpi=400)
+    plt.savefig(folder_name + '/' + fig_name + '.png', dpi=400)
 
 
 # Adding CLA
@@ -193,32 +250,42 @@ if os.path.isdir(args.folder_name):
     try:
         net.load_state_dict(torch.load(args.folder_name + '/trained_model.pt'))
         if sys.platform == 'linux':
-            os.system('echo parameters were loaded successfully!')
+            os.system('echo Parameters were loaded successfully!')
         else:
             print('Parameters were loaded successfully!')
         total_training_loss_vs_epoch = np.load(args.folder_name + '/total_training_loss_vs_epoch.npy').tolist()
-        activation_training_loss_loss_vs_epoch = np.load(
-            args.folder_name + '/activation_training_loss_loss_vs_epoch.npy').tolist()
-        kernel_training_loss_vs_epoch = np.load(args.folder_name + '/kernel_training_loss_vs_epoch.npy').tolist()
         total_val_loss_vs_epoch = np.load(args.folder_name + '/total_val_loss_vs_epoch.npy').tolist()
-        activation_val_loss_loss_vs_epoch = np.load(
-            args.folder_name + '/activation_val_loss_loss_vs_epoch.npy').tolist()
-        kernel_val_loss_vs_epoch = np.load(args.folder_name + '/kernel_val_loss_vs_epoch.npy').tolist()
+        training_regulated_loss_vs_epoch = np.load(args.folder_name + '/training_regulated_loss_vs_epoch.npy').tolist()
+        validation_regulated_loss_vs_epoch = np.load(args.folder_name + '/validation_regulated_loss_vs_epoch.npy').tolist()
+        activation_mse_training_loss_vs_epoch = np.load(args.folder_name + '/activation_mse_training_loss_vs_epoch.npy').tolist()
+        activation_mse_val_loss_loss_vs_epoch = np.load(args.folder_name + '/activation_mse_val_loss_loss_vs_epoch.npy').tolist()
+        kernel_mse_training_loss_vs_epoch = np.load(args.folder_name + '/kernel_mse_training_loss_vs_epoch.npy').tolist()
+        kernel_mse_val_loss_vs_epoch = np.load(args.folder_name + '/kernel_mse_val_loss_vs_epoch.npy').tolist()
+        training_class_loss_vs_epoch = np.load(args.folder_name + '/training_class_loss_vs_epoch.npy').tolist()
+        validation_class_loss_vs_epoch = np.load(args.folder_name + '/validation_class_loss_vs_epoch.npy').tolist()
     except FileNotFoundError:
         total_training_loss_vs_epoch = []
-        activation_training_loss_loss_vs_epoch = []
-        kernel_training_loss_vs_epoch = []
         total_val_loss_vs_epoch = []
-        activation_val_loss_loss_vs_epoch = []
-        kernel_val_loss_vs_epoch = []
-else:
+        training_regulated_loss_vs_epoch = []
+        validation_regulated_loss_vs_epoch = []
+        activation_mse_training_loss_vs_epoch = []
+        activation_mse_val_loss_loss_vs_epoch = []
+        kernel_mse_training_loss_vs_epoch = []
+        kernel_mse_val_loss_vs_epoch = []
+        training_class_loss_vs_epoch = []
+        validation_class_loss_vs_epoch = []
+else:  # The folder doesn't exist, so create it and initialize lists
     os.system("mkdir {}".format(args.folder_name))
     total_training_loss_vs_epoch = []
-    activation_training_loss_loss_vs_epoch = []
-    kernel_training_loss_vs_epoch = []
     total_val_loss_vs_epoch = []
-    activation_val_loss_loss_vs_epoch = []
-    kernel_val_loss_vs_epoch = []
+    training_regulated_loss_vs_epoch = []
+    validation_regulated_loss_vs_epoch = []
+    activation_mse_training_loss_vs_epoch = []
+    activation_mse_val_loss_loss_vs_epoch = []
+    kernel_mse_training_loss_vs_epoch = []
+    kernel_mse_val_loss_vs_epoch = []
+    training_class_loss_vs_epoch = []
+    validation_class_loss_vs_epoch = []
 
 individual_loss = SumIndividualLoss()
 
@@ -264,30 +331,46 @@ for epoch in pbar:
         optimizer.step()
 
     net.eval()  # put the net into evaluation mode
+
     total_training_loss = compute_loss(training_dataloader, net, individual_loss)
     total_validation_loss = compute_loss(valid_dataloader, net, individual_loss)
-    activation_training_loss, kernel_training_loss = compute_mse_loss(training_dataloader, net)
-    activation_val_loss, kernel_val_loss = compute_mse_loss(valid_dataloader, net)
+    training_regulated_loss = compute_regularized_loss(training_dataloader, net, cost_fun)
+    validation_regulated_loss = compute_regularized_loss(valid_dataloader, net, cost_fun)
+    activation_training_mse_loss, kernel_training_mse_loss = compute_mse_loss(training_dataloader, net)
+    activation_val_mse_loss, kernel_val_mse_loss = compute_mse_loss(valid_dataloader, net)
+    activation_training_classLoss = compute_class_loss(training_dataloader, net)
+    activation_validation_classLoss = compute_class_loss(training_dataloader, net)
 
     total_training_loss_vs_epoch.append(total_training_loss.data.cpu().numpy())
-    activation_training_loss_loss_vs_epoch.append(activation_training_loss.data.cpu().numpy())
-    kernel_training_loss_vs_epoch.append(kernel_training_loss.data.cpu().numpy())
-
     total_val_loss_vs_epoch.append(total_validation_loss.data.cpu().numpy())
-    activation_val_loss_loss_vs_epoch.append(activation_val_loss.data.cpu().numpy())
-    kernel_val_loss_vs_epoch.append(kernel_val_loss.data.cpu().numpy())
+    training_regulated_loss_vs_epoch.append(training_regulated_loss)
+    validation_regulated_loss_vs_epoch.append(validation_regulated_loss)
+    activation_mse_training_loss_vs_epoch.append(activation_training_mse_loss.data.cpu().numpy())
+    activation_mse_val_loss_loss_vs_epoch.append(activation_val_mse_loss.data.cpu().numpy())
+    kernel_mse_training_loss_vs_epoch.append(kernel_training_mse_loss.data.cpu().numpy())
+    kernel_mse_val_loss_vs_epoch.append(kernel_val_mse_loss.data.cpu().numpy())
+    training_class_loss_vs_epoch.append(activation_training_classLoss.data.cpu().numpy())
+    validation_class_loss_vs_epoch.append(activation_validation_classLoss.data.cpu().numpy())
 
     if min(total_val_loss_vs_epoch) == total_val_loss_vs_epoch[-1]:
         torch.save(net.state_dict(), args.folder_name + '/trained_model.pt')
 
-    np.save(args.folder_name + '/total_training_loss_vs_epoch', total_training_loss_vs_epoch)
-    np.save(args.folder_name + '/activation_training_loss_loss_vs_epoch', activation_training_loss_loss_vs_epoch)
-    np.save(args.folder_name + '/kernel_training_loss_vs_epoch', kernel_training_loss_vs_epoch)
-    np.save(args.folder_name + '/total_val_loss_vs_epoch', total_val_loss_vs_epoch)
-    np.save(args.folder_name + '/activation_val_loss_loss_vs_epoch', activation_val_loss_loss_vs_epoch)
-    np.save(args.folder_name + '/kernel_val_loss_vs_epoch', kernel_val_loss_vs_epoch)
+    np.save(args.folder_name + '/total_training_loss_vs_epoch.npy', total_training_loss_vs_epoch)
+    np.save(args.folder_name + '/total_val_loss_vs_epoch.npy', total_val_loss_vs_epoch)
+    np.save(args.folder_name + '/training_regulated_loss_vs_epoch.npy', training_regulated_loss_vs_epoch)
+    np.save(args.folder_name + '/validation_regulated_loss_vs_epoch.npy', validation_regulated_loss_vs_epoch)
+    np.save(args.folder_name + '/activation_mse_training_loss_vs_epoch.npy', activation_mse_training_loss_vs_epoch)
+    np.save(args.folder_name + '/activation_mse_val_loss_loss_vs_epoch.npy', activation_mse_val_loss_loss_vs_epoch)
+    np.save(args.folder_name + '/kernel_mse_training_loss_vs_epoch.npy', kernel_mse_training_loss_vs_epoch)
+    np.save(args.folder_name + '/kernel_mse_val_loss_vs_epoch.npy', kernel_mse_val_loss_vs_epoch)
+    np.save(args.folder_name + '/training_class_loss_vs_epoch.npy', training_class_loss_vs_epoch)
+    np.save(args.folder_name + '/validation_class_loss_vs_epoch.npy', validation_class_loss_vs_epoch)
+
 
 # Plotting results
-plot_losses(total_training_loss_vs_epoch, total_val_loss_vs_epoch, kernel_training_loss_vs_epoch,
-            kernel_val_loss_vs_epoch, activation_training_loss_loss_vs_epoch, activation_val_loss_loss_vs_epoch,
-            args.folder_name)
+plot_loss(total_training_loss_vs_epoch, total_val_loss_vs_epoch, 'total loss', args.folder_name)
+plot_loss(training_regulated_loss_vs_epoch, validation_regulated_loss_vs_epoch, 'regulated loss', args.folder_name)
+plot_loss(activation_mse_training_loss_vs_epoch, activation_mse_val_loss_loss_vs_epoch, 'activation mse loss', args.folder_name)
+plot_loss(kernel_mse_training_loss_vs_epoch, kernel_mse_val_loss_vs_epoch, 'kernel mse loss', args.folder_name)
+plot_loss(training_class_loss_vs_epoch, validation_class_loss_vs_epoch, 'classification loss', args.folder_name)
+
