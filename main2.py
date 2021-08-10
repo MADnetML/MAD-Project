@@ -7,7 +7,7 @@ from tqdm import tqdm
 from scipy.signal import convolve
 import matplotlib.pyplot as plt
 import torch
-from model2 import MADNet, MADNet2  # model -> model2
+from model2 import MADNet, MADNet2, MADNet3 # model -> model2
 from stored_dataset import QPIDataSet
 from custom_losses import SumIndividualLoss
 from torch.optim import Adam
@@ -190,8 +190,8 @@ parser = argparse.ArgumentParser(description=
 parser.add_argument("-m", "--model",
                     dest='model',
                     type=int,
-                    choices=[1, 2],
-                    help="Specify which model (MADNet1 of MADNet2) will be used",
+                    choices=[1, 2, 3],
+                    help="Specify which model (MADNet1 or MADNet2 or MADNet3) will be used",
                     required=True)
 parser.add_argument("-e", "--epochs",
                     dest='epochs',
@@ -243,8 +243,10 @@ measurement_size = (1, 200, 200)
 
 if model == 1:
     net = MADNet(measurement_size)
-else:
+elif model == 2:
     net = MADNet2(measurement_size)
+else:
+    net = MADNet3(measurement_size)
 
 if os.path.isdir(args.folder_name):
     try:

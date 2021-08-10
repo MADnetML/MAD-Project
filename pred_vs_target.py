@@ -3,7 +3,7 @@ from tqdm import tqdm
 from scipy.signal import convolve
 import matplotlib.pyplot as plt
 import torch
-from model import MADNet, MADNet2
+from model2 import MADNet, MADNet2, MADNet3
 import torch.nn as nn
 from stored_dataset import QPIDataSet
 from torch.utils.data import DataLoader
@@ -117,9 +117,12 @@ SNR = 2
 if model == 1:
     net = MADNet(measurement_size)
     trained_model_path = 'trained_model1.pt'
-else:
+elif model == 2:
     net = MADNet2(measurement_size)
     trained_model_path = 'trained_model2.pt'
+else:
+    net = MADNet3(measurement_size)
+    trained_model_path = 'trained_model3.pt'
 
 
 net.load_state_dict(torch.load(trained_model_path))
