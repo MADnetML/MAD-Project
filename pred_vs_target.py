@@ -34,7 +34,7 @@ def regulator(X):
     """
     X_array = np.array(X)
     mu = 10 ** -6  # A small positive number (chosen in the paper to be 10 ** -6)
-    return np.sum(mu ** 2 * (np.sqrt(1 + (mu ** -2) * X_array) - 1))
+    return np.sum(mu ** 2 * (np.sqrt(1 + (mu ** -2) * np.abs(X_array)) - 1))
 
 
 def cost_fun(lambda_in, ker, act, meas):
