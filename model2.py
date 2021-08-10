@@ -61,10 +61,8 @@ class MADNet(nn.Module):
         self.classifier = nn.Sequential(
             nn.Conv2d(1, 4, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0)),
             nn.ReLU(inplace=True),
-            nn.Dropout(p=0.5, inplace=False),
             nn.Conv2d(4, 4, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0)),
             nn.ReLU(inplace=True),
-            nn.Dropout(p=0.5, inplace=False),
             nn.Conv2d(4, 2, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0)),
         )
 
@@ -95,10 +93,8 @@ class MADNet2(nn.Module):
         self.classifier = nn.Sequential(
             nn.Conv2d(1, 4, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0)),
             nn.ReLU(inplace=True),
-            nn.Dropout(p=0.5, inplace=False),
             nn.Conv2d(4, 4, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0)),
             nn.ReLU(inplace=True),
-            nn.Dropout(p=0.5, inplace=False),
             nn.Conv2d(4, 2, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0)),
         )
 
