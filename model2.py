@@ -36,7 +36,6 @@ def fix_sizes(matrix_in, out_size):
 class MADNet(nn.Module):
     def __init__(self, input_shape, look_in=False):
         """
-
         :param input_shape: (E, n1, n2)
         :param look_in: If true, returns activation, kernel AND active_cnn, kernel_cnn
         """
