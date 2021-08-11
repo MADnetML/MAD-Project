@@ -11,13 +11,19 @@ class RegulatedLoss(nn.Module):
     def __init__(self, rmagnitude):
         super().__init__()
         self.rmagnitude = rmagnitude
+        self.mu = 10 ** -6
+
+    def regulator(self, activation):
+        return torch.sum(self.mu ** 2 * (torch.sqrt(1 + (self.mu ** -2) * torch.abs(activation)) - 1))
 
     def forward(self, activation, kernel, target):
-        conv = torch.zeros(target.shape)
-        for batch_idx, batch_kernel in enumerate(kernel):
-            conv[batch_idx] = F.conv2d(activation, batch_kernel, padding='same')
-        loss = F.mse_loss(conv, target) / 2 + self.rmagnitude * matrix_norm(activation)
-        loss = Variable(loss, requires_grad=True)
+        conv = []
+        for i in range(activation.shape[0]):
+            batch_kernel = kernel[i].unsqueeze(dim=0)
+            batch_activation = activation[i].unsqueeze(dim=0)
+            conv.append(F.conv2d(batch_activation, batch_kernel, padding='same'))
+        conv_stack = torch.stack(conv, dim=0).squeeze(dim=1)
+        loss = F.mse_loss(conv_stack, target) / 2 + self.rmagnitude * self.regulator(activation)
 
         if torch.cuda.is_available():
             return loss.cuda()
@@ -103,8 +109,8 @@ class SumIndividualLoss(nn.Module):
 
     def forward(self, activation, activation_classes, kernel, activation_target, kernel_target):
         kernel_pixels = kernel.shape[-1] ** 2
-        activation_classes_target = 1*(activation_target > 1)  # Creates class labels
-        activation_loss = self.activation_class_loss(activation_classes, activation_classes_target) # Added
+        activation_classes_target = 1 * (activation_target > 1)  # Creates class labels
+        activation_loss = self.activation_class_loss(activation_classes, activation_classes_target)  # Added
         activation_loss += F.mse_loss(activation.squeeze(), activation_target)  # Added
         activation_loss = activation_loss / (activation.shape[-1] ** 2)  # Added
         if kernel.shape[-1] > kernel_target.shape[-1]:
@@ -115,7 +121,7 @@ class SumIndividualLoss(nn.Module):
             kernel_loss = F.mse_loss(kernel, kernel_target) / kernel_pixels
 
         loss = self.weights[0] * activation_loss + self.weights[1] * kernel_loss
-
+        loss = 1e6 * loss
         if torch.cuda.is_available():
             return loss.cuda()
         return loss
