@@ -13,6 +13,7 @@ from custom_losses import SumIndividualLoss, RegulatedLoss
 from torch.optim import Adam
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from time import time
 
 
 def conv_per_layer(activation, kernel, requires_grad=False):
@@ -64,7 +65,7 @@ def compute_loss(dataloader, network, loss_function):
             predic_measurement = conv_per_layer(predic_active, predic_kernel)
 
             # loss += loss_function(predic_active, predic_active_classes, predic_kernel, activation_map, kernel)
-            if args.choose_loss == 'regulated':
+            if args.choose_loss == 'regulated' or args.choose_loss == 'r':
                 loss += loss_function(predic_active, predic_kernel, measurement)
             else:
                 loss += loss_function(predic_active, predic_active_classes, predic_kernel, activation_map, kernel)
@@ -220,7 +221,7 @@ parser.add_argument("-fn", "--folder-name",
 parser.add_argument("-lf", "--loss-func",
                     dest='choose_loss',
                     type=str,
-                    choices=['regulated', 'individual'],
+                    choices=['regulated', 'individual', 'r', 'i'],
                     help="Loss function to be used in computing the loss",
                     required=True)
 
@@ -300,7 +301,7 @@ else:  # The folder doesn't exist, so create it and initialize lists
     validation_class_loss_vs_epoch = []
 
 # individual_loss = SumIndividualLoss
-if args.choose_loss == 'regulated':
+if args.choose_loss == 'regulated' or args.choose_loss == 'r':
     total_loss = RegulatedLoss(0.01)  # Added
 else:
     total_loss = SumIndividualLoss()
@@ -319,19 +320,23 @@ if torch.cuda.is_available():
 
 n_epochs = args.epochs
 
-pbar = tqdm(range(n_epochs))
-
-for epoch in pbar:
-
+start_time = time()
+for epoch in range(n_epochs):
+    end_time = time()
     if len(total_val_loss_vs_epoch) > 1:
-        pbar.set_description('Val loss: %.3f, '
-                             'Best: %.3f; '
-                             'Training loss: %.3f '
-                             'Best: %.3f ' % (total_val_loss_vs_epoch[-1],
-                                              min(total_val_loss_vs_epoch),
-                                              total_training_loss_vs_epoch[-1],
-                                              min(total_training_loss_vs_epoch)
-                                              ))
+        tot_time = end_time - start_time
+        if sys.platform == 'linux':
+            os.system('echo Time for epoch %d: %d seconds' % (epoch, tot_time))
+            os.system('echo Val loss: %.3f' % total_val_loss_vs_epoch[-1])
+            os.system('echo Best: %.3f' % min(total_val_loss_vs_epoch))
+            os.system('echo Training loss: %.3f' % total_training_loss_vs_epoch[-1])
+            os.system('echo Best: %.3f' % min(total_training_loss_vs_epoch))
+        else:
+            print('Time for epoch %d: %d seconds' % (epoch, tot_time))
+            print('Val loss: %.3f' % total_val_loss_vs_epoch[-1])
+            print('Best: %.3f' % min(total_val_loss_vs_epoch))
+            print('Training loss: %.3f' % total_training_loss_vs_epoch[-1])
+            print('Best: %.3f' % min(total_training_loss_vs_epoch))
 
     net.train()  # put the net into "training mode"
     for target_measurement, target_kernel, target_activation in training_dataloader:
@@ -342,7 +347,7 @@ for epoch in pbar:
         pred_active, pred_active_class, pred_kernel = net(target_measurement)
         pred_measurement = conv_per_layer(pred_active, pred_kernel, requires_grad=True)
         # loss = individual_loss(pred_active.squeeze(), pred_active_class, pred_kernel, target_activation, target_kernel)
-        if args.choose_loss == 'regulated':
+        if args.choose_loss == 'regulated' or args.choose_loss == 'r':
             loss = total_loss(pred_active, pred_kernel, target_measurement)  # Added
         else:
             loss = total_loss(pred_active.squeeze(), pred_active_class, pred_kernel, target_activation, target_kernel)
