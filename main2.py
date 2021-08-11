@@ -7,9 +7,9 @@ from tqdm import tqdm
 from scipy.signal import convolve
 import matplotlib.pyplot as plt
 import torch
-from model2 import MADNet, MADNet2  # model -> model2
+from model2 import MADNet, MADNet2, MADNet3  # model -> model2
 from stored_dataset import QPIDataSet
-from custom_losses import SumIndividualLoss
+from custom_losses import SumIndividualLoss, RegulatedLoss
 from torch.optim import Adam
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -63,7 +63,8 @@ def compute_loss(dataloader, network, loss_function):
             # This line does convolution per energy level
             predic_measurement = conv_per_layer(predic_active, predic_kernel)
 
-            loss += loss_function(predic_active, predic_active_classes, predic_kernel, activation_map, kernel)
+            # loss += loss_function(predic_active, predic_active_classes, predic_kernel, activation_map, kernel)
+            loss += loss_function(predic_active, predic_kernel, measurement)
 
     return loss / n_batches
 
@@ -190,8 +191,8 @@ parser = argparse.ArgumentParser(description=
 parser.add_argument("-m", "--model",
                     dest='model',
                     type=int,
-                    choices=[1, 2],
-                    help="Specify which model (MADNet1 of MADNet2) will be used",
+                    choices=[1, 2, 3],
+                    help="Specify which model (MADNet1 or MADNet2 or MADNet3) will be used",
                     required=True)
 parser.add_argument("-e", "--epochs",
                     dest='epochs',
@@ -243,8 +244,10 @@ measurement_size = (1, 200, 200)
 
 if model == 1:
     net = MADNet(measurement_size)
-else:
+elif model == 2:
     net = MADNet2(measurement_size)
+else:
+    net = MADNet3(measurement_size)
 
 if os.path.isdir(args.folder_name):
     try:
@@ -287,7 +290,8 @@ else:  # The folder doesn't exist, so create it and initialize lists
     training_class_loss_vs_epoch = []
     validation_class_loss_vs_epoch = []
 
-individual_loss = SumIndividualLoss()
+# individual_loss = SumIndividualLoss
+regulated_loss = RegulatedLoss(0.01)  # Added
 
 lr = 1e-4
 if args.lr:
@@ -311,10 +315,10 @@ for epoch in pbar:
         pbar.set_description('Val loss: %.3f, '
                              'Best: %.3f; '
                              'Training loss: %.3f '
-                             'Best: %.3f ' % (1e6 * total_val_loss_vs_epoch[-1],
-                                              1e6 * min(total_val_loss_vs_epoch),
-                                              1e6 * total_training_loss_vs_epoch[-1],
-                                              1e6 * min(total_training_loss_vs_epoch)
+                             'Best: %.3f ' % (total_val_loss_vs_epoch[-1],
+                                              min(total_val_loss_vs_epoch),
+                                              total_training_loss_vs_epoch[-1],
+                                              min(total_training_loss_vs_epoch)
                                               ))
 
     net.train()  # put the net into "training mode"
@@ -325,15 +329,15 @@ for epoch in pbar:
         optimizer.zero_grad()
         pred_active, pred_active_class, pred_kernel = net(target_measurement)
         pred_measurement = conv_per_layer(pred_active, pred_kernel, requires_grad=True)
-        # Added pred_active_class arg
-        loss = individual_loss(pred_active.squeeze(), pred_active_class, pred_kernel, target_activation, target_kernel)
+        # loss = individual_loss(pred_active.squeeze(), pred_active_class, pred_kernel, target_activation, target_kernel)
+        loss = regulated_loss(pred_active, pred_kernel, target_measurement)  # Added
         loss.backward()
         optimizer.step()
 
     net.eval()  # put the net into evaluation mode
 
-    total_training_loss = compute_loss(training_dataloader, net, individual_loss)
-    total_validation_loss = compute_loss(valid_dataloader, net, individual_loss)
+    total_training_loss = compute_loss(training_dataloader, net, regulated_loss)  # individual_loss -> regulated_loss
+    total_validation_loss = compute_loss(valid_dataloader, net, regulated_loss)  # individual_loss -> regulated_loss
     training_regulated_loss = compute_regularized_loss(training_dataloader, net, cost_fun)
     validation_regulated_loss = compute_regularized_loss(valid_dataloader, net, cost_fun)
     activation_training_mse_loss, kernel_training_mse_loss = compute_mse_loss(training_dataloader, net)
