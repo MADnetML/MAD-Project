@@ -8,7 +8,7 @@ from model import fix_sizes
 
 
 class RegulatedLoss(nn.Module):
-    def __init__(self, rmagnitude):
+    def __init__(self, rmagnitude=0.1):
         super().__init__()
         self.rmagnitude = rmagnitude
         self.mu = 10 ** -6
@@ -24,7 +24,7 @@ class RegulatedLoss(nn.Module):
             conv.append(F.conv2d(batch_activation, batch_kernel, padding='same'))
         conv_stack = torch.stack(conv, dim=0).squeeze(dim=1)
         loss = F.mse_loss(conv_stack, target) / 2 + self.rmagnitude * self.regulator(activation)
-
+        loss /= activation.shape[0]
         if torch.cuda.is_available():
             return loss.cuda()
         return loss
