@@ -18,7 +18,6 @@ class CnnInit(nn.Module):
             layers.append(nn.Conv2d(hidden_layers[i - 1], hidden_layers[i], kernel_size=(3, 3), padding=1))
             layers.append(nn.ReLU())
         layers.append(nn.Conv2d(hidden_layers[-1], out_channels, kernel_size=(3, 3), padding=1))
-        layers.append(nn.ReLU())
 
         self.cnn = nn.Sequential(*layers)
 
@@ -45,3 +44,6 @@ class CnnShrink(nn.Module):
 
     def forward(self, x):
         return self.cnn(x)
+
+
+
