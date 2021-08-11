@@ -64,7 +64,10 @@ def compute_loss(dataloader, network, loss_function):
             predic_measurement = conv_per_layer(predic_active, predic_kernel)
 
             # loss += loss_function(predic_active, predic_active_classes, predic_kernel, activation_map, kernel)
-            loss += loss_function(predic_active, predic_kernel, measurement)
+            if args.choose_loss == 'regulated':
+                loss += loss_function(predic_active, predic_kernel, measurement)
+            else:
+                loss += loss_function(predic_active, predic_active_classes, predic_kernel, activation_map, kernel)
 
     return loss / n_batches
 
@@ -214,6 +217,12 @@ parser.add_argument("-fn", "--folder-name",
                     type=str,
                     help="Name of folder for output files to be saved in",
                     required=True)
+parser.add_argument("-lf", "--loss-func",
+                    dest='choose_loss',
+                    type=str,
+                    choices=['regulated', 'individual'],
+                    help="Loss function to be used in computing the loss",
+                    required=True)
 
 args = parser.parse_args()
 if not args.batch_size:
@@ -291,7 +300,10 @@ else:  # The folder doesn't exist, so create it and initialize lists
     validation_class_loss_vs_epoch = []
 
 # individual_loss = SumIndividualLoss
-regulated_loss = RegulatedLoss(0.01)  # Added
+if args.choose_loss == 'regulated':
+    total_loss = RegulatedLoss(0.01)  # Added
+else:
+    total_loss = SumIndividualLoss()
 
 lr = 1e-4
 if args.lr:
@@ -330,14 +342,18 @@ for epoch in pbar:
         pred_active, pred_active_class, pred_kernel = net(target_measurement)
         pred_measurement = conv_per_layer(pred_active, pred_kernel, requires_grad=True)
         # loss = individual_loss(pred_active.squeeze(), pred_active_class, pred_kernel, target_activation, target_kernel)
-        loss = regulated_loss(pred_active, pred_kernel, target_measurement)  # Added
+        if args.choose_loss == 'regulated':
+            loss = total_loss(pred_active, pred_kernel, target_measurement)  # Added
+        else:
+            loss = total_loss(pred_active.squeeze(), pred_active_class, pred_kernel, target_activation, target_kernel)
+
         loss.backward()
         optimizer.step()
 
     net.eval()  # put the net into evaluation mode
 
-    total_training_loss = compute_loss(training_dataloader, net, regulated_loss)  # individual_loss -> regulated_loss
-    total_validation_loss = compute_loss(valid_dataloader, net, regulated_loss)  # individual_loss -> regulated_loss
+    total_training_loss = compute_loss(training_dataloader, net, total_loss)  # individual_loss -> regulated_loss
+    total_validation_loss = compute_loss(valid_dataloader, net, total_loss)  # individual_loss -> regulated_loss
     training_regulated_loss = compute_regularized_loss(training_dataloader, net, cost_fun)
     validation_regulated_loss = compute_regularized_loss(valid_dataloader, net, cost_fun)
     activation_training_mse_loss, kernel_training_mse_loss = compute_mse_loss(training_dataloader, net)
