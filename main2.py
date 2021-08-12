@@ -177,11 +177,10 @@ def plot_loss(training, validation, fig_name, folder_name):
     ax.set_title('Total Loss')
     ax.plot(training, label='Training')
     ax.plot(validation, label='Validation')
-
+    ax.set_yscale('log')
     handles, labels = ax.get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper right')
     ax.set_xlim(left=0)
-    ax.set_ylim(bottom=0)
     for axis in ['top', 'bottom', 'left', 'right']:
         ax.spines[axis].set_linewidth(2)
     ax.set_title(fig_name)
