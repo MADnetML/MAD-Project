@@ -358,7 +358,8 @@ for epoch in range(n_epochs):
         pred_measurement = conv_per_layer(pred_active, pred_kernel, requires_grad=True)
         # loss = individual_loss(pred_active.squeeze(), pred_active_class, pred_kernel, target_activation, target_kernel)
         if args.choose_loss == 'regulated' or args.choose_loss == 'r':
-            loss = total_loss(pred_active, pred_kernel, target_measurement)  # Added
+            loss = total_loss(pred_active, target_kernel, target_measurement)\
+                   + total_loss(target_activation.unsqueeze(dim=1), pred_kernel, target_measurement)
         else:
             loss = total_loss(pred_active.squeeze(), pred_active_class, pred_kernel, target_activation, target_kernel)
 
