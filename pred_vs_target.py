@@ -16,8 +16,8 @@ def conv_per_layer(activation, kernel):
     """
     Convolves, per-layer
     """
-    kernel = np.array(torch.squeeze(kernel, dim=0).detach())
-    activation = np.array(activation.squeeze().detach())
+    kernel = np.array(torch.squeeze(kernel, dim=0).detach().cpu())
+    activation = np.array(activation.squeeze().detach().cpu())
     levels, m1, m2 = np.shape(kernel)
     n1, n2 = np.shape(activation)
     out = np.zeros([levels, n1, n2])
@@ -33,7 +33,7 @@ def regulator(X):
     :param X: 2D matrix
     :return: A real number
     """
-    X_array = np.array(X)
+    X_array = np.array(X.cpu())
     mu = 10 ** -6  # A small positive number (chosen in the paper to be 10 ** -6)
     return np.sum(mu ** 2 * (np.sqrt(1 + (mu ** -2) * np.abs(X_array)) - 1))
 
@@ -42,7 +42,7 @@ def cost_fun(lambda_in, ker, act, meas):
     """
     The cost function = 0.5|A conv X - Y|**2 + lambda * r(X)
     """
-    meas = np.array(torch.squeeze(meas, dim=0))
+    meas = np.array(torch.squeeze(meas, dim=0).cpu())
     s, n1, n2 = np.shape(meas)
     meas_pred = conv_per_layer(act, ker)
     phi = 0.5 * np.sum((meas_pred - meas) ** 2) + lambda_in * regulator(act)
@@ -50,21 +50,28 @@ def cost_fun(lambda_in, ker, act, meas):
 
 
 def plot_pics(ker_pred, act_pred, meas_pred, ker, act, meas, folder_name, losses='', title='Prediction', i=0):
-    act = np.array(act.squeeze().detach())
-    act_pred = np.array(act_pred.squeeze().detach())
-    ker = np.array(ker.squeeze().detach())
-    ker_pred = np.array(ker_pred.squeeze().detach())
-    meas = np.array(meas.squeeze().detach())
+    act = np.array(act.squeeze().detach().cpu())
+    act_pred = np.array(act_pred.squeeze().detach().cpu())
+    ker = np.array(ker.squeeze().detach().cpu())
+    ker_pred = np.array(ker_pred.squeeze().detach().cpu())
+    meas = np.array(meas.squeeze().detach().cpu())
 
     meas_max, meas_min = meas.max(), meas.min()
     ker_max, ker_min = ker.max(), ker.min()
     act_max, act_min = act.max(), act.min()
 
+    pred_meas_max, pred_meas_min = pred_meas.max(), pred_meas.min()
+    pred_ker_max, pred_ker_min = ker_pred.max(), ker_pred.min()
+    pred_act_max, pred_act_min = act_pred.max(), act_pred.min()
+
     fig, axs = plt.subplots(2, 3, figsize=(9, 6))
     fig.suptitle(title + '\n' + losses)
-    plot_data = [[ker_pred, act_pred, meas_pred[i]],
+    plot_data = [[ker_pred, act_pred, meas_pred[0]],
                  [ker, act, meas]]
-    maxes, mins = [ker_max, act_max, meas_max], [ker_min, act_min, meas_min]
+    maxes = [[pred_ker_max, pred_act_max, pred_meas_max],
+             [ker_max, act_max, meas_max]]
+    mins = [[pred_ker_min, pred_act_min, pred_meas_min],
+            [ker_min, act_min, meas_min]]
     titles = [['Kernel Pred', 'Activation Pred', 'Measurement Pred'],
               ['Kernel Target', 'Activation Target', 'Measurement Target']]
 
@@ -73,9 +80,10 @@ def plot_pics(ker_pred, act_pred, meas_pred, ker, act, meas, folder_name, losses
             axs[row, col].set_title(titles[row][col])
             divider = make_axes_locatable(axs[row, col])
             cax = divider.append_axes("right", size="5%", pad=0.05)
-            im = axs[row, col].imshow(plot_data[row][col], vmin=mins[col], vmax=maxes[col])
+            im = axs[row, col].imshow(plot_data[row][col], vmin=mins[row][col], vmax=maxes[row][col])
             axs[row, col].axis('off')
-            fig.colorbar(im, ax=axs[row, col], cax=cax, ticks=[mins[col], (mins[col]+maxes[col]) / 2, 0,  maxes[col]])
+            fig.colorbar(im, ax=axs[row, col], cax=cax,
+                         ticks=[mins[row][col], (mins[row][col] + maxes[row][col]) / 2, 0, maxes[row][col]])
     plt.tight_layout()
 
     plt.savefig(folder_name + '/' + title + '.png', dpi=400)
@@ -118,10 +126,10 @@ parser.add_argument("-fn", "--folder-name",
                     type=str,
                     help="Name of folder for output files to be saved in",
                     required=True)
-parser.add_argument("-el", "--energy-levels",
-                    dest='energy_levels',
+parser.add_argument("-pn", "--pic-num",
+                    dest='pic_num',
                     type=int,
-                    help="Number of energy levels (zeroth dimension of measurement size)",
+                    help="Number of pictures to save",
                     required=True)
 # parser.add_argument("-nos", "--number-of-samples",
 #                     dest='number_of_samples',
@@ -131,17 +139,13 @@ parser.add_argument("-el", "--energy-levels",
 
 args = parser.parse_args()
 
-
-
-# number_of_samples = args.number_of_samples
 number_of_samples = len(os.listdir(os.getcwd() + '/testing_dataset')) // 3
 
-measurement_size = (args.energy_levels, 200, 200)
+measurement_size = (1, 200, 200)
 E, n1, n2 = measurement_size
 kernel_size = (20, 20)
 defect_density = np.random.uniform(low=-4, high=-1, size=number_of_samples)
 SNR = 2
-
 
 if args.model == 1:
     net = MADNet(measurement_size)
@@ -149,7 +153,6 @@ elif args.model == 2:
     net = MADNet2(measurement_size)
 elif args.model == 3:
     net = MADNet3(measurement_size)
-
 
 if torch.cuda.is_available():
     net.load_state_dict(torch.load(args.folder_name + '/trained_model.pt'))
@@ -163,13 +166,14 @@ testing_dataloader = DataLoader(test_ds)
 net_loss = compute_regularized_loss(testing_dataloader, net, cost_fun)
 basline_loss = compute_regularized_loss(testing_dataloader, net, cost_fun, baseline=True)
 
-measurement, kernel, activation_map = next(iter(testing_dataloader))
-pred_active, _, pred_kernel = net(measurement)
-pred_meas = conv_per_layer(pred_active, pred_kernel)
-# idx_array = np.random.choice(range(E), 3, replace=False)
-idx_array = [0]
 losses = f'Loss = {round(net_loss, 2)}, basline = {round(basline_loss, 2)}'
-for idx in idx_array:
+
+i_max = args.pic_num
+for i, (measurement, kernel, activation_map) in enumerate(testing_dataloader):
+    if i == i_max:
+        break
+    pred_active, _, pred_kernel = net(measurement)
+    pred_meas = conv_per_layer(pred_active, pred_kernel)
     plot_pics(pred_kernel, pred_active, pred_meas,
               kernel, activation_map, measurement, args.folder_name,
-              losses, f'Model{args.model} Prediction{idx}', idx)
+              losses, f'Model{args.model} Prediction{i}')
