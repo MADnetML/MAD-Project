@@ -224,6 +224,11 @@ parser.add_argument("-lf", "--loss-func",
                     choices=['regulated', 'individual', 'r', 'i'],
                     help="Loss function to be used in computing the loss",
                     required=True)
+parser.add_argument("-r", "--regularization",
+                    dest='reg',
+                    type=float,
+                    help="Regularization term magnitude",
+                    required=False)
 
 args = parser.parse_args()
 if not args.batch_size:
@@ -232,6 +237,7 @@ if sys.platform == 'linux':
     os.system('echo ==========================================================')
     os.system(
         'echo Using model {} with {} epochs and batch size of {}'.format(args.model, args.epochs, args.batch_size))
+    os.system('echo Using loss function {}'.format(args.choose_loss))
     if args.lr:
         os.system('echo Learning rate = {}.\n'.format(args.lr))
     else:
@@ -301,8 +307,13 @@ else:  # The folder doesn't exist, so create it and initialize lists
     validation_class_loss_vs_epoch = []
 
 # individual_loss = SumIndividualLoss
+
+reg = 0.01
+if args.reg:
+    reg = args.reg
+
 if args.choose_loss == 'regulated' or args.choose_loss == 'r':
-    total_loss = RegulatedLoss(0.01)  # Added
+    total_loss = RegulatedLoss(reg)  # Added
 else:
     total_loss = SumIndividualLoss()
 
@@ -327,16 +338,16 @@ for epoch in range(n_epochs):
         tot_time = end_time - start_time
         if sys.platform == 'linux':
             os.system('echo Time for epoch %d: %d seconds' % (epoch, tot_time))
-            os.system('echo Val loss: %.3f' % total_val_loss_vs_epoch[-1])
-            os.system('echo Best: %.3f' % min(total_val_loss_vs_epoch))
-            os.system('echo Training loss: %.3f' % total_training_loss_vs_epoch[-1])
-            os.system('echo Best: %.3f' % min(total_training_loss_vs_epoch))
+            os.system('echo Val loss: %.6f' % total_val_loss_vs_epoch[-1])
+            os.system('echo Best: %.6f' % min(total_val_loss_vs_epoch))
+            os.system('echo Training loss: %.6f' % total_training_loss_vs_epoch[-1])
+            os.system('echo Best: %.6f' % min(total_training_loss_vs_epoch))
         else:
             print('Time for epoch %d: %d seconds' % (epoch, tot_time))
-            print('Val loss: %.3f' % total_val_loss_vs_epoch[-1])
-            print('Best: %.3f' % min(total_val_loss_vs_epoch))
-            print('Training loss: %.3f' % total_training_loss_vs_epoch[-1])
-            print('Best: %.3f' % min(total_training_loss_vs_epoch))
+            print('Val loss: %.6f' % total_val_loss_vs_epoch[-1])
+            print('Best: %.6f' % min(total_val_loss_vs_epoch))
+            print('Training loss: %.6f' % total_training_loss_vs_epoch[-1])
+            print('Best: %.6f' % min(total_training_loss_vs_epoch))
 
     net.train()  # put the net into "training mode"
     for target_measurement, target_kernel, target_activation in training_dataloader:
