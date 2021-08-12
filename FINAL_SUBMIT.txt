@@ -1,0 +1,19 @@
+./seq_arr.sh -e 25 -c "bsub -J M2r1[1-25] -H -q yan-gpu -app nvidia-gpu -env LSB_CONTAINER_IMAGE=nvcr.io/nvidia/pytorch:21.07-py3 -R rusage[mem=1000] -gpu num=2:j_exclusive=yes -e MADNet2REG2/reg1/error.%J -o MADNet2REG2/reg1/sum.%J python3 main2.py --model 2 --epochs 4 -lr 1e-4 -r 1e-1 --batch-size 100 -lf individual --folder-name MADNet2REG2/reg1"
+
+./seq_arr.sh -e 25 -c "bsub -J M2r2[1-25] -H -q yan-gpu -app nvidia-gpu -env LSB_CONTAINER_IMAGE=nvcr.io/nvidia/pytorch:21.07-py3 -R rusage[mem=1000] -gpu num=2:j_exclusive=yes -e MADNet2REG2/reg01/error.%J -o MADNet2REG2/reg01/sum.%J python3 main2.py --model 2 --epochs 4 -lr 1e-4 -r 1e-2 --batch-size 100 -lf individual --folder-name MADNet2REG2/reg01"
+
+
+./seq_arr.sh -e 25 -c "bsub -J M2r3[1-25] -H -q yan-gpu -app nvidia-gpu -env LSB_CONTAINER_IMAGE=nvcr.io/nvidia/pytorch:21.07-py3 -R rusage[mem=1000] -gpu num=2:j_exclusive=yes -e MADNet2REG2/reg001/error.%J -o MADNet2REG2/reg001/sum.%J python3 main2.py --model 2 --epochs 4 -lr 1e-4 -r 1e-3 --batch-size 100 -lf individual --folder-name MADNet2REG2/reg001"
+
+./seq_arr.sh -e 25 -c "bsub -J M2r4[1-25] -H -q yan-gpu -app nvidia-gpu -env LSB_CONTAINER_IMAGE=nvcr.io/nvidia/pytorch:21.07-py3 -R rusage[mem=1000] -gpu num=2:j_exclusive=yes -e MADNet2REG2/reg0001/error.%J -o MADNet2REG2/reg0001/sum.%J python3 main2.py --model 2 --epochs 4 -lr 1e-4 -r 1e-4 --batch-size 100 -lf individual --folder-name MADNet2REG2/reg0001"
+
+
+
+./seq_arr.sh -e 25 -c "bsub -J M3r1[1-25] -H -q yan-gpu -app nvidia-gpu -env LSB_CONTAINER_IMAGE=nvcr.io/nvidia/pytorch:21.07-py3 -R rusage[mem=1000] -gpu num=2:j_exclusive=yes -e MADNet3REG2/reg1/error.%J -o MADNet3REG2/reg1/sum.%J python3 main2.py --model 3 --epochs 4 -lr 1e-4 -r 1e-1 --batch-size 100 -lf individual --folder-name MADNet3REG2/reg1"
+
+./seq_arr.sh -e 25 -c "bsub -J M3r2[1-25] -H -q yan-gpu -app nvidia-gpu -env LSB_CONTAINER_IMAGE=nvcr.io/nvidia/pytorch:21.07-py3 -R rusage[mem=1000] -gpu num=2:j_exclusive=yes -e MADNet3REG2/reg01/error.%J -o MADNet3REG2/reg01/sum.%J python3 main2.py --model 3 --epochs 4 -lr 1e-4 -r 1e-2 --batch-size 100 -lf individual --folder-name MADNet3REG2/reg01"
+
+
+./seq_arr.sh -e 25 -c "bsub -J M3r3[1-25] -H -q yan-gpu -app nvidia-gpu -env LSB_CONTAINER_IMAGE=nvcr.io/nvidia/pytorch:21.07-py3 -R rusage[mem=1000] -gpu num=2:j_exclusive=yes -e MADNet3REG2/reg001/error.%J -o MADNet3REG2/reg001/sum.%J python3 main2.py --model 3 --epochs 4 -lr 1e-4 -r 1e-3 --batch-size 100 -lf individual --folder-name MADNet3REG2/reg001"
+
+./seq_arr.sh -e 25 -c "bsub -J M3r4[1-25] -H -q yan-gpu -app nvidia-gpu -env LSB_CONTAINER_IMAGE=nvcr.io/nvidia/pytorch:21.07-py3 -R rusage[mem=1000] -gpu num=2:j_exclusive=yes -e MADNet3REG2/reg0001/error.%J -o MADNet3REG2/reg0001/sum.%J python3 main2.py --model 3 --epochs 4 -lr 1e-4 -r 1e-4 --batch-size 100 -lf individual --folder-name MADNet2REG2/reg0001"
